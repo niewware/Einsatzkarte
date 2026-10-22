@@ -1,0 +1,3780 @@
+<meta charset="utf-8">
+<title>Einsatzkarte</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --paper:#f3f1ea; --ink:#2c3227; --ink-soft:#6b7060; --line:#c9cbba; --panel:#fbfaf4;
+  --accent:#c2452d; --accent-soft:#c2452d22;
+  --shadow:0 8px 24px rgba(40,50,40,.18), 0 2px 6px rgba(40,50,40,.12);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0; background:#bfcdd4; color:var(--ink); font-family:Archivo,system-ui,sans-serif; overflow:hidden}
+.stage{position:fixed; inset:0; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-user-drag:none}
+.stage.dragging{cursor:grabbing}
+.stage.boxmode{cursor:crosshair}
+.stage.place{cursor:crosshair}
+#dt{cursor:default}
+svg{display:block; width:100%; height:100%}
+.card{position:fixed; background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow)}
+#topbar{top:12px; left:12px; z-index:5; padding:8px 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; max-width:calc(100vw - 24px)}
+#topbar .ttl{font-weight:700; font-size:15px; margin-right:4px}
+#topbar button{border:1px solid var(--line); background:#fff; color:var(--ink); font:600 12.5px Archivo,sans-serif; border-radius:7px; padding:6px 11px; cursor:pointer}
+#topbar button:hover{background:var(--accent-soft)}
+#topbar button.active{background:var(--accent); color:#fff; border-color:var(--accent)}
+#colors{display:flex; gap:5px; align-items:center}
+#colors .cw{width:22px; height:22px; border-radius:50%; border:2px solid #fff; outline:1px solid var(--line); cursor:pointer; padding:0}
+#colors .cw.active{outline:2.5px solid var(--ink)}
+#status{bottom:12px; left:50%; transform:translateX(-50%); z-index:6; padding:8px 16px; font:600 12.5px Archivo,sans-serif; max-width:min(620px,88vw); text-align:center; display:none}
+#saved{top:64px; left:12px; z-index:5; padding:10px 12px; width:300px; max-height:62vh; overflow-y:auto; display:none}
+#saved .cap{font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin-bottom:6px}
+.srow{display:flex; align-items:center; gap:6px; border-top:1px solid #eceade; padding:6px 0}
+.srow:first-of-type{border-top:none}
+.srow .load{flex:1; text-align:left; border:none; background:none; color:var(--ink); font:500 12px Archivo,sans-serif; cursor:pointer; padding:0}
+.srow .load:hover{color:var(--accent)}
+.srow .load .sub{display:block; font-size:10.5px; color:var(--ink-soft)}
+.srow .ic{border:none; background:none; cursor:pointer; font-size:14px; padding:2px 4px; opacity:.55}
+.srow .ic:hover{opacity:1}
+.srow .ic.pinned{opacity:1}
+#attrib{position:fixed; right:6px; bottom:4px; z-index:4; font:400 10px Archivo,sans-serif; color:#4b524a; background:#ffffffb0; padding:1px 6px; border-radius:4px}
+#selrect{position:fixed; border:2px dashed var(--accent); background:#c2452d15; z-index:5; display:none; pointer-events:none}
+#uiov{position:fixed; inset:0; z-index:5; pointer-events:none}
+#rcur{position:fixed; z-index:9; pointer-events:none; display:none; transform:translate(-14px,-14px)}
+#cmdline{fill:none; stroke:var(--accent); stroke-width:2.5; stroke-dasharray:8 6; display:none}
+.framerect{fill:none; stroke:#b3402e; stroke-width:2.5; vector-effect:non-scaling-stroke; stroke-dasharray:10 6}
+#zoomctl{bottom:12px; right:12px; z-index:5; display:flex; flex-direction:column; overflow:hidden; border-radius:8px}
+#zoomctl button{width:38px; height:38px; border:none; border-bottom:1px solid var(--line); background:transparent; color:var(--ink); font-size:19px; cursor:pointer}
+#zoomctl button:last-child{border-bottom:none}
+#zoomctl button:hover{background:var(--accent-soft)}
+
+/* Detailkarte (Vektor) */
+.green{fill:#cfe6bd; stroke:none}
+.forest{fill:#aed095; stroke:none}
+.water{fill:#a9cbe8; stroke:#8fb5d6; stroke-width:.5}
+.bld{fill:#d9cfc2; stroke:#bcae9f; stroke-width:.4}
+.passage{fill:none; stroke:#fdfcf8; stroke-opacity:.72; stroke-linecap:round; stroke-linejoin:round}
+.barrier{fill:none; stroke:#9a7d5e; stroke-width:.7; stroke-dasharray:2 1.4}
+.case-maj{fill:none; stroke:#d2b87c; stroke-linecap:round; stroke-linejoin:round}
+.case-min{fill:none; stroke:#c8c1b4; stroke-linecap:round; stroke-linejoin:round}
+.road-maj{fill:none; stroke:#ffe3a4; stroke-linecap:round; stroke-linejoin:round}
+.road-min{fill:none; stroke:#ffffff; stroke-linecap:round; stroke-linejoin:round}
+.road-path{fill:none; stroke:#a58a6f; stroke-dasharray:3 2.2; stroke-linecap:round}
+.rail{fill:none; stroke:#8b8b8b; stroke-dasharray:6 4}
+.roadlbl{font:600 7px Archivo,sans-serif; fill:#71685a; letter-spacing:.4px}
+.poidot{fill:#7a5640; stroke:#fff; stroke-width:.8}
+.poilbl{font:600 6.5px Archivo,sans-serif; fill:#5d4630; paint-order:stroke; stroke:#f3f1ea; stroke-width:2px}
+.routeline{fill:none; stroke-width:2.2; stroke-dasharray:7 5; vector-effect:non-scaling-stroke; opacity:.85}
+.mring{fill:none; stroke-width:1.6; stroke-dasharray:3 3; opacity:.9}
+.hpring{fill:none; stroke-width:2.6}
+.hpbg{fill:none; stroke:#00000022; stroke-width:2.6}
+.objlbl{font:700 8px Archivo,sans-serif; paint-order:stroke; stroke:#fff; stroke-width:2.5px}
+.spotring{fill:none; stroke-width:2; stroke-dasharray:4 3; vector-effect:non-scaling-stroke}
+</style>
+
+<div class="stage" id="ov"></div>
+<div class="stage" id="dt" style="display:none"></div>
+<div id="selrect"></div>
+<svg id="uiov"><polyline id="cmdline"/></svg>
+<div id="rcur">
+  <svg id="rcurX" width="28" height="28" viewBox="0 0 28 28">
+    <circle cx="14" cy="14" r="8" fill="none" stroke="#fff" stroke-width="4.2"/>
+    <circle cx="14" cy="14" r="8" fill="none" stroke="#1c1c1a" stroke-width="1.9"/>
+  </svg>
+  <svg id="rcurP" width="28" height="28" viewBox="0 0 28 28" style="display:none">
+    <g stroke="#fff" stroke-width="4.2" stroke-linecap="round">
+      <circle cx="14" cy="14" r="8" fill="none"/>
+      <line x1="14" y1="2" x2="14" y2="26"/><line x1="2" y1="14" x2="26" y2="14"/>
+    </g>
+    <g stroke="#1c1c1a" stroke-width="1.9" stroke-linecap="round">
+      <circle cx="14" cy="14" r="8" fill="none"/>
+      <line x1="14" y1="2" x2="14" y2="26"/><line x1="2" y1="14" x2="26" y2="14"/>
+    </g>
+  </svg>
+</div>
+
+<div class="card" id="topbar">
+  <span class="ttl">Einsatzkarte</span>
+  <button id="btnBox">▭ Bereich wählen</button>
+  <button id="btnBack" style="display:none">← Übersicht</button>
+  <button id="btnMk" style="display:none">📍 Setzen</button>
+  <select id="mode" style="display:none; font:600 12.5px Archivo,sans-serif; border:1px solid var(--line); border-radius:7px; padding:5px 8px; background:#fff; color:var(--ink)">
+    <option value="skirmish">Scharmützel</option>
+    <option value="ctf">Capture the Flag</option>
+    <option value="defusal">Defusal</option>
+  </select>
+  <button id="btnStart" style="display:none">▶ Start</button>
+  <button id="btnSave" style="display:none" title="Diesen Bereich als Datei speichern">💾</button>
+  <span id="score" style="display:none; font:600 12.5px Archivo,sans-serif; color:var(--ink-soft)"></span>
+  <span id="colors" style="display:none"></span>
+</div>
+<div class="card" id="saved">
+  <div class="cap">Gespeicherte Bereiche</div>
+  <div id="savedlist"></div>
+  <label style="display:block; margin-top:8px; font:600 12px Archivo,sans-serif; color:var(--ink); cursor:pointer; border-top:1px solid #eceade; padding-top:8px">📄 Karte aus Datei laden …<input type="file" id="fileload" accept=".json,application/json" style="display:none"></label>
+</div>
+<div class="card" id="status"></div>
+<div class="card" id="zoomctl">
+  <button id="zin">+</button>
+  <button id="zout">−</button>
+</div>
+<div id="attrib">Karte: © OpenStreetMap-Mitwirkende · Kacheln: OSM</div>
+
+<script>
+"use strict";
+const NS="http://www.w3.org/2000/svg";
+const statusEl=document.getElementById("status");
+function setStatus(t){ if(!t){statusEl.style.display="none";return;} statusEl.textContent=t; statusEl.style.display="block"; }
+const OSRV=["https://maps.mail.ru/osm/tools/overpass/api/interpreter","https://overpass.kumi.systems/api/interpreter","https://overpass-api.de/api/interpreter"];
+async function overpass(q, onTry){
+  for(let i=0;i<OSRV.length;i++){
+    if(onTry) onTry(i+1,OSRV.length);
+    const ctl=new AbortController();
+    const to=setTimeout(()=>ctl.abort(),25000);
+    try{
+      const r=await fetch(OSRV[i]+"?data="+encodeURIComponent(q),{signal:ctl.signal});
+      clearTimeout(to);
+      if(!r.ok) throw 0;
+      return await r.json();
+    }catch(e){ clearTimeout(to); }
+  }
+  return null;
+}
+
+/* ============ Pan/Zoom-Controller ============ */
+function makeStage(el, opts){
+  opts=opts||{};
+  const svg=document.createElementNS(NS,"svg");
+  const root=document.createElementNS(NS,"g");
+  svg.appendChild(root); el.appendChild(svg);
+  const st={el, svg, root, k:1, tx:0, ty:0, minK:0.01, maxK:1e9, leftPan:opts.leftPan!==false,
+            boxMode:false, onChange:null, onClick:null, onDblClick:null, onBox:null,
+            onLeftDragMove:null, onLeftDragEnd:null, onRightUp:null, onRightDown:null, onRightDragMove:null};
+  let rightT0=0;
+  function apply(){
+    root.setAttribute("transform",`translate(${st.tx} ${st.ty}) scale(${st.k})`);
+    if(st.onChange) st.onChange();
+  }
+  st.apply=apply;
+  st.zoomAt=(cx,cy,f)=>{
+    const k2=Math.min(st.maxK,Math.max(st.minK,st.k*f));
+    const r=k2/st.k;
+    st.tx=cx-(cx-st.tx)*r; st.ty=cy-(cy-st.ty)*r; st.k=k2;
+    apply();
+  };
+  el.addEventListener("wheel",e=>{ e.preventDefault(); st.zoomAt(e.clientX,e.clientY,Math.pow(1.0015,-e.deltaY)); },{passive:false});
+  el.addEventListener("dragstart",e=>e.preventDefault());
+  el.addEventListener("contextmenu",e=>e.preventDefault());
+  const ptrs=new Map();
+  let pinch=0, gtype=null, start=null, moved=false;
+  const selrect=document.getElementById("selrect");
+  el.addEventListener("pointerdown",e=>{
+    e.preventDefault(); el.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(ptrs.size===1){
+      moved=false; start={x:e.clientX,y:e.clientY};
+      if(st.boxMode&&e.button===0) gtype="box";
+      else if(e.button===1) gtype="pan";
+      else if(e.button===0) gtype=st.leftPan?"pan":"left";
+      else if(e.button===2){ gtype="right"; rightT0=performance.now(); if(st.onRightDown) st.onRightDown(e.clientX,e.clientY); }
+      else gtype=null;
+      if(gtype==="pan") el.classList.add("dragging");
+    } else if(ptrs.size===2){
+      gtype="pinch";
+      const [a,b]=[...ptrs.values()]; pinch=Math.hypot(a.x-b.x,a.y-b.y);
+    }
+  });
+  el.addEventListener("pointermove",e=>{
+    if(!ptrs.has(e.pointerId)) return;
+    const p=ptrs.get(e.pointerId);
+    const dx=e.clientX-p.x, dy=e.clientY-p.y;
+    ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(Math.abs(e.clientX-start.x)+Math.abs(e.clientY-start.y)>4) moved=true;
+    if(gtype==="pinch"&&ptrs.size===2){
+      const [a,b]=[...ptrs.values()];
+      const d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(pinch>0) st.zoomAt((a.x+b.x)/2,(a.y+b.y)/2,d/pinch);
+      pinch=d;
+      return;
+    }
+    if(gtype==="pan"){ st.tx+=dx; st.ty+=dy; apply(); }
+    else if(gtype==="box"&&moved){
+      const x0=Math.min(start.x,e.clientX), y0=Math.min(start.y,e.clientY);
+      selrect.style.display="block";
+      selrect.style.left=x0+"px"; selrect.style.top=y0+"px";
+      selrect.style.width=Math.abs(e.clientX-start.x)+"px";
+      selrect.style.height=Math.abs(e.clientY-start.y)+"px";
+      if(st.onBoxMove) st.onBoxMove(start.x,start.y,e.clientX,e.clientY);
+    }
+    else if(gtype==="left"&&moved&&st.onLeftDragMove){
+      st.onLeftDragMove(start.x,start.y,e.clientX,e.clientY);
+    }
+    else if(gtype==="right"&&moved&&st.onRightDragMove){
+      st.onRightDragMove(start.x,start.y,e.clientX,e.clientY);
+    }
+  });
+  function up(e){
+    const had=ptrs.delete(e.pointerId);
+    if(ptrs.size===0) el.classList.remove("dragging");
+    if(!had) return;
+    if(gtype==="pinch"){ pinch=0; if(ptrs.size<2) gtype=null; return; }
+    const g=gtype; gtype=null;
+    if(g==="box"){
+      selrect.style.display="none";
+      if(moved&&st.onBox) st.onBox(start.x,start.y,e.clientX,e.clientY);
+      return;
+    }
+    if(g==="left"){
+      if(moved){ if(st.onLeftDragEnd) st.onLeftDragEnd(start.x,start.y,e.clientX,e.clientY); }
+      else if(st.onClick) st.onClick(e.clientX,e.clientY);
+      return;
+    }
+    if(g==="right"){
+      if(st.onRightUp) st.onRightUp(e.clientX,e.clientY,performance.now()-rightT0,moved);
+      return;
+    }
+    if(g==="pan"&&!moved&&st.leftPan&&st.onClick&&e.button===0) st.onClick(e.clientX,e.clientY);
+  }
+  el.addEventListener("pointerup",up);
+  el.addEventListener("pointercancel",e=>{ ptrs.delete(e.pointerId); pinch=0; gtype=null; selrect.style.display="none"; el.classList.remove("dragging"); });
+  el.addEventListener("dblclick",e=>{ if(st.onDblClick) st.onDblClick(e.clientX,e.clientY); });
+  return st;
+}
+
+/* ============ Stufe A: Uebersicht ============ */
+const MSC=40000, OX=19000, OY=12800;
+const PXo=lon=>(lon+180)/360*MSC-OX;
+const PYo=lat=>{const r=lat*Math.PI/180; return (1-Math.asinh(Math.tan(r))/Math.PI)/2*MSC-OY;};
+const LONo=x=>(x+OX)/MSC*360-180;
+const LATo=y=>Math.atan(Math.sinh(Math.PI*(1-2*(y+OY)/MSC)))*180/Math.PI;
+
+const ov=makeStage(document.getElementById("ov"),{leftPan:true});
+const ovTiles=document.createElementNS(NS,"g");
+ov.root.appendChild(ovTiles);
+const tileMap=new Map();
+let tileTimer=0;
+function ovTileURL(z,x,y){
+  if(z<=13) return `https://${"abc"[(x+y)%3]}.tile.opentopomap.org/${z}/${x}/${y}.png`;
+  return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+}
+function updateOvTiles(){
+  const dpr=window.devicePixelRatio||1;
+  const z=Math.max(5,Math.min(14,Math.round(Math.log2(MSC*ov.k/256))+(dpr>1.5?1:0)));
+  const n=1<<z, ts=MSC/n;
+  const wx0=(-ov.tx)/ov.k+OX, wy0=(-ov.ty)/ov.k+OY;
+  const wx1=(innerWidth-ov.tx)/ov.k+OX, wy1=(innerHeight-ov.ty)/ov.k+OY;
+  const x0=Math.max(0,Math.floor(wx0/ts)-1), x1=Math.min(n-1,Math.floor(wx1/ts)+1);
+  const y0=Math.max(0,Math.floor(wy0/ts)-1), y1=Math.min(n-1,Math.floor(wy1/ts)+1);
+  if((x1-x0+1)*(y1-y0+1)>140) return;
+  const want=new Set();
+  for(let x=x0;x<=x1;x++) for(let y=y0;y<=y1;y++){
+    const key=z+"/"+x+"/"+y; want.add(key);
+    if(tileMap.has(key)) continue;
+    const img=document.createElementNS(NS,"image");
+    img.setAttribute("href",ovTileURL(z,x,y));
+    img.setAttribute("x",x*ts-OX); img.setAttribute("y",y*ts-OY);
+    img.setAttribute("width",ts); img.setAttribute("height",ts);
+    img.setAttribute("preserveAspectRatio","none");
+    img.addEventListener("error",()=>{ img.remove(); tileMap.delete(key); });
+    ovTiles.appendChild(img); tileMap.set(key,img);
+  }
+  for(const [key,img] of tileMap){ if(!want.has(key)){ img.remove(); tileMap.delete(key); } }
+}
+ov.onChange=()=>{ clearTimeout(tileTimer); tileTimer=setTimeout(updateOvTiles,120); };
+function fitGermany(){
+  const x0=PXo(5.8), x1=PXo(15.1), y0=PYo(55.2), y1=PYo(47.2);
+  const k=Math.min(innerWidth/(x1-x0), innerHeight/(y1-y0))*0.97;
+  ov.minK=k*0.7; ov.maxK=k*400;
+  ov.k=k;
+  ov.tx=(innerWidth-(x1-x0)*k)/2 - x0*k;
+  ov.ty=(innerHeight-(y1-y0)*k)/2 - y0*k;
+  ov.apply();
+}
+const btnBox=document.getElementById("btnBox");
+btnBox.onclick=()=>{
+  ov.boxMode=!ov.boxMode;
+  btnBox.classList.toggle("active",ov.boxMode);
+  document.getElementById("ov").classList.toggle("boxmode",ov.boxMode);
+  setStatus(ov.boxMode?"Rechteck über den gewünschten Bereich ziehen (Kantenlänge max. ca. 2 km).":null);
+};
+const MAXSIDE=3000;
+function boxDims(sx0,sy0,sx1,sy1){
+  const lon0=LONo((Math.min(sx0,sx1)-ov.tx)/ov.k), lon1=LONo((Math.max(sx0,sx1)-ov.tx)/ov.k);
+  const latN=LATo((Math.min(sy0,sy1)-ov.ty)/ov.k), latS=LATo((Math.max(sy0,sy1)-ov.ty)/ov.k);
+  const cos0=Math.cos((latN+latS)/2*Math.PI/180);
+  return {lon0,lon1,latN,latS, wm:(lon1-lon0)*111320*cos0, hm:(latN-latS)*110574};
+}
+ov.onBoxMove=(sx0,sy0,sx1,sy1)=>{
+  const d=boxDims(sx0,sy0,sx1,sy1);
+  const over=d.wm>MAXSIDE||d.hm>MAXSIDE;
+  document.getElementById("selrect").style.borderColor=over?"#c2452d":"#2d9c57";
+  setStatus(`Auswahl: ${(d.wm/1000).toFixed(2)} × ${(d.hm/1000).toFixed(2)} km ${over?"– zu groß! Maximum "+(MAXSIDE/1000).toFixed(1)+" km je Kante":"(max. "+(MAXSIDE/1000).toFixed(1)+" × "+(MAXSIDE/1000).toFixed(1)+" km)"}`);
+};
+ov.onBox=(sx0,sy0,sx1,sy1)=>{
+  document.getElementById("selrect").style.borderColor="";
+  const d=boxDims(sx0,sy0,sx1,sy1);
+  const {lon0,lon1,latN,latS,wm,hm}=d;
+  if(wm>MAXSIDE||hm>MAXSIDE){ setStatus(`Bereich zu groß (${(wm/1000).toFixed(1)} × ${(hm/1000).toFixed(1)} km) – Maximum ${(MAXSIDE/1000).toFixed(1)} km je Kante.`); return; }
+  if(wm<120||hm<120){ setStatus("Bereich sehr klein – bitte etwas größer aufziehen."); return; }
+  ov.boxMode=false; btnBox.classList.remove("active");
+  document.getElementById("ov").classList.remove("boxmode");
+  loadArea(latS,lon0,latN,lon1);
+};
+
+/* ============ Karten-Cache (IndexedDB, letzte 10 + gepinnte) ============ */
+let _db=null, idbError=null;
+function idb(){
+  return new Promise((res,rej)=>{
+    if(_db) return res(_db);
+    const to=setTimeout(()=>{ idbError=idbError||"Zeitüberschreitung – Datenbank für diese Datei blockiert"; rej(idbError); },2000);
+    let rq;
+    try{ rq=indexedDB.open("einsatzkarte",1); }
+    catch(e){ clearTimeout(to); idbError=e; return rej(e); }
+    rq.onupgradeneeded=()=>rq.result.createObjectStore("maps",{keyPath:"id"});
+    rq.onsuccess=()=>{ clearTimeout(to); _db=rq.result; idbError=null; res(_db); };
+    rq.onerror=()=>{ clearTimeout(to); idbError=rq.error; rej(rq.error); };
+  });
+}
+function idbAll(){ return idb().then(d=>new Promise((res,rej)=>{ const rq=d.transaction("maps").objectStore("maps").getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>rej(rq.error); })).catch(()=>[]); }
+function idbPut(rec){ return idb().then(d=>new Promise((res,rej)=>{ const tx=d.transaction("maps","readwrite"); tx.objectStore("maps").put(rec); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); })).catch(()=>{}); }
+function idbDel(id){ return idb().then(d=>new Promise((res,rej)=>{ const tx=d.transaction("maps","readwrite"); tx.objectStore("maps").delete(id); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); })).catch(()=>{}); }
+async function saveCache(S,W,N,E,data,label){
+  const key=r=>[r.S.toFixed(4),r.W.toFixed(4),r.N.toFixed(4),r.E.toFixed(4)].join("|");
+  const all=await idbAll();
+  const me={S,W,N,E};
+  const old=all.find(r=>key(r)===key(me));
+  const rec={id:old?old.id:Date.now(), ts:Date.now(), pinned:old?old.pinned:false,
+             S,W,N,E, label, size:JSON.stringify(data).length, data};
+  await idbPut(rec);
+  // nur die letzten 10 ungepinnten behalten
+  const rest=(await idbAll()).filter(r=>!r.pinned).sort((a,b)=>b.ts-a.ts);
+  for(const r of rest.slice(10)) await idbDel(r.id);
+  renderSaved();
+}
+async function renderSaved(){
+  const box=document.getElementById("saved");
+  const list=document.getElementById("savedlist");
+  const all=(await idbAll()).sort((a,b)=>(b.pinned-a.pinned)||(b.ts-a.ts));
+  if(area){ box.style.display="none"; return; }
+  if(idbError){
+    box.style.display="block";
+    list.innerHTML='<div style="font:400 11.5px Archivo,sans-serif;color:var(--ink-soft)">Karten-Speicher nicht verfügbar – der Browser blockiert die Datenbank für diese Datei ('+String(idbError).replace(/[<>&]/g,"")+'). Tipp: Datei auf ein lokales Laufwerk (z. B. C:) kopieren und von dort öffnen.</div>';
+    return;
+  }
+  if(!all.length){
+    box.style.display="block";
+    list.innerHTML='<div style="font:400 11.5px Archivo,sans-serif;color:var(--ink-soft)">Noch keine Bereiche geladen – der nächste geladene Bereich wird hier gespeichert (die letzten 10, 📌 dauerhaft).</div>';
+    return;
+  }
+  box.style.display="block";
+  list.innerHTML="";
+  for(const r of all){
+    const cos0=Math.cos((r.S+r.N)/2*Math.PI/180);
+    const wm=((r.E-r.W)*111320*cos0/1000).toFixed(1), hm=((r.N-r.S)*110574/1000).toFixed(1);
+    const row=document.createElement("div");
+    row.className="srow";
+    const b=document.createElement("button");
+    b.className="load";
+    b.innerHTML=`${r.label?String(r.label).replace(/[<>&]/g,"")+" · ":""}${wm} × ${hm} km<span class="sub">${new Date(r.ts).toLocaleString("de-DE",{dateStyle:"short",timeStyle:"short"})} · ${(r.size/1e6).toFixed(1)} MB${r.pinned?" · 📌 dauerhaft":""}</span>`;
+    b.onclick=async()=>{ r.ts=Date.now(); await idbPut(r); loadArea(r.S,r.W,r.N,r.E,r.data); };
+    const pin=document.createElement("button");
+    pin.className="ic"+(r.pinned?" pinned":"");
+    pin.textContent="📌"; pin.title=r.pinned?"Nicht mehr dauerhaft speichern":"Dauerhaft speichern (zählt nicht zu den letzten 10)";
+    pin.onclick=async()=>{ r.pinned=!r.pinned; await idbPut(r); renderSaved(); };
+    const del=document.createElement("button");
+    del.className="ic"; del.textContent="🗑"; del.title="Löschen";
+    del.onclick=async()=>{ await idbDel(r.id); renderSaved(); };
+    row.appendChild(b); row.appendChild(pin); row.appendChild(del);
+    list.appendChild(row);
+  }
+}
+
+/* ============ Stufe B: Detailbereich ============ */
+const dt=makeStage(document.getElementById("dt"),{leftPan:false});
+{ // Fog-of-War-Maske: weiss = Nebel, schwarze Sichtpolygone stanzen Loecher
+  const defs=document.createElementNS(NS,"defs");
+  defs.innerHTML='<filter id="fogblur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4"/></filter>'
+    +'<mask id="fogmask" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000"><rect id="fogw" fill="#fff"/><path id="fogholes" fill="#000" fill-rule="nonzero" filter="url(#fogblur)"/></mask>';
+  dt.svg.insertBefore(defs, dt.svg.firstChild);
+}
+let area=null;
+const L={};
+for(const n of ["bg","green","water","bld","passage","barrier","fence","caseMaj","caseMin","roadMaj","roadMin","paths","rail","rlbl","poi","comp","frame","vision","know","obj","focus","walk"]){
+  const g=document.createElementNS(NS,"g"); dt.root.appendChild(g); L[n]=g;
+}
+const MAJ=/^(motorway|trunk|primary|secondary|tertiary)(_link)?$/;
+const PTH=/^(footway|path|cycleway|steps|track|bridleway)$/;
+const roadW=h=>/motorway/.test(h)?13:/trunk|primary/.test(h)?10:/secondary/.test(h)?8.5:/tertiary/.test(h)?7:/pedestrian/.test(h)?6:/service/.test(h)?3.5:5;
+const isPassage=tg=>tg.tunnel==="building_passage"||tg.covered==="yes"||tg.covered==="arcade"||tg.tunnel==="yes";
+
+function clearDetail(){
+  for(const g of Object.values(L)) g.innerHTML="";
+  markers.length=0; sel.clear();
+}
+async function loadArea(S,W,N,E,cached){
+  const bb=`(${S.toFixed(6)},${W.toFixed(6)},${N.toFixed(6)},${E.toFixed(6)})`;
+  const q=`[out:json][timeout:90];(
+way["building"]${bb};
+way["highway"]${bb};
+way["railway"~"^(rail|tram|light_rail)$"]${bb};
+way["barrier"]${bb};
+way["amenity"="parking"]${bb};
+way["natural"~"^(water|wood|scrub)$"]${bb};
+way["waterway"="riverbank"]${bb};
+way["landuse"~"^(forest|grass|meadow|cemetery|allotments|orchard|vineyard|recreation_ground|village_green)$"]${bb};
+way["leisure"~"^(park|pitch|garden|playground|sports_centre|golf_course)$"]${bb};
+relation["building"]${bb};
+relation["natural"="water"]${bb};
+relation["leisure"~"^(park|garden)$"]${bb};
+relation["landuse"~"^(forest|grass|meadow|cemetery)$"]${bb};
+node["historic"]["name"]${bb};way["historic"]["name"]${bb};
+node["tourism"~"^(attraction|museum|viewpoint)$"]["name"]${bb};way["tourism"~"^(attraction|museum)$"]["name"]${bb};
+node["amenity"~"^(place_of_worship|townhall|marketplace|theatre)$"]["name"]${bb};way["amenity"~"^(place_of_worship|townhall|marketplace|theatre)$"]["name"]${bb};
+);out geom 80000;`;
+  let data=cached||null;
+  if(!data){
+    data=await overpass(q,(i,n)=>setStatus(`Lade Kartendaten aus OpenStreetMap … (Server ${i}/${n}, einmalig)`));
+    if(!data){ setStatus("OSM-Daten nicht erreichbar – bitte erneut versuchen (Datei muss lokal geöffnet sein)."); return; }
+  }
+  setStatus("Baue Karte und Wegenetz …");
+  await new Promise(r=>setTimeout(r,30));
+  clearDetail();
+  const lat0=(S+N)/2, cos0=Math.cos(lat0*Math.PI/180);
+  const mLat=110574, mLon=111320*cos0;
+  const Wm=(E-W)*mLon, Hm=(N-S)*mLat;
+  area={S,W,N,E,mLat,mLon,Wm,Hm};
+  const X=lon=>(lon-W)*mLon, Y=lat=>(N-lat)*mLat;
+  const ptsOf=el=>el.geometry.map(g2=>[X(g2.lon),Y(g2.lat)]);
+  // Wichtigkeit eines benannten Merkmals (0 = gar nicht beschriften)
+  const poiPrio=tg=>{
+    if(tg.historic){
+      if(/^(memorial|wayside_cross|wayside_shrine|stolperstein|blue_plaque|ghost_bike|boundary_stone|milestone|highwater_mark)$/.test(tg.historic)) return 0;
+      if(/^(castle|fort|citywalls|city_gate|tower|church|monastery|ruins|monument|archaeological_site)$/.test(tg.historic)) return 3;
+      return 1;
+    }
+    if(tg.amenity==="place_of_worship"||tg.amenity==="townhall"||tg.amenity==="theatre") return 3;
+    if(tg.amenity==="marketplace") return 2;
+    if(tg.tourism==="museum") return 3;
+    if(tg.tourism==="viewpoint") return 2;
+    return 1;
+  };
+  const blds=[], bldInner=[], barriers=[], waters=[], waterInner=[], greens=[], forests=[], roads=[], rails=[], pois=[], passages=[], parkings=[];
+  // Multipolygon-Relationen: Mitglieds-Wege zu Ringen zusammensetzen
+  function assembleRings(members){
+    const src={outer:[],inner:[]};
+    for(const mm of (members||[])){
+      if(mm.type!=="way"||!mm.geometry) continue;
+      const role=mm.role==="inner"?"inner":"outer";
+      src[role].push(mm.geometry.map(g2=>[X(g2.lon),Y(g2.lat)]));
+    }
+    const out={outer:[],inner:[]};
+    const close=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1])<0.5;
+    for(const role of ["outer","inner"]){
+      const ways=src[role], used=new Array(ways.length).fill(false);
+      for(let i=0;i<ways.length;i++){
+        if(used[i]) continue;
+        used[i]=true;
+        let ring=[...ways[i]], guard=0;
+        while(!close(ring[0],ring[ring.length-1]) && guard++<=ways.length){
+          let found=false;
+          for(let j2=0;j2<ways.length;j2++){
+            if(used[j2]) continue;
+            const w2=ways[j2];
+            if(close(ring[ring.length-1],w2[0])){ ring=ring.concat(w2.slice(1)); used[j2]=true; found=true; break; }
+            if(close(ring[ring.length-1],w2[w2.length-1])){ ring=ring.concat([...w2].reverse().slice(1)); used[j2]=true; found=true; break; }
+          }
+          if(!found) break;
+        }
+        if(ring.length>=4) out[role].push(ring);
+      }
+    }
+    return out;
+  }
+  for(const el of (data.elements||[])){
+    const tg=el.tags||{};
+    if(el.type==="relation"&&el.members){
+      const rg=assembleRings(el.members);
+      if(tg.building){ blds.push(...rg.outer); bldInner.push(...rg.inner); }
+      else if(tg.natural==="water"){ waters.push(...rg.outer); waterInner.push(...rg.inner); }
+      else if(tg.natural==="wood"||tg.landuse==="forest"){ forests.push(...rg.outer); }
+      else if(tg.leisure||tg.landuse){ greens.push(...rg.outer, ...rg.inner); }
+      continue;
+    }
+    if(el.type==="way"&&el.geometry){
+      const p=ptsOf(el);
+      if(tg.building) blds.push(p);
+      else if(tg.highway){
+        const r={p,h:tg.highway,name:tg.name||""};
+        roads.push(r);
+        if(isPassage(tg)) passages.push(r);
+      }
+      else if(tg.railway) rails.push(p);
+      else if(tg.barrier) barriers.push(p);
+      else if(tg.amenity==="parking") parkings.push(p);
+      else if(tg.natural==="water"||tg.waterway) waters.push(p);
+      else if(tg.natural==="wood"||tg.landuse==="forest") forests.push(p);
+      else if(tg.natural==="scrub"||tg.landuse||tg.leisure) greens.push(p);
+      if((tg.historic||tg.tourism||tg.amenity)&&tg.name&&!tg.highway){
+        const cx=p.reduce((s,q2)=>s+q2[0],0)/p.length, cy=p.reduce((s,q2)=>s+q2[1],0)/p.length;
+        pois.push({x:cx,y:cy,name:tg.name,prio:poiPrio(tg)});
+      }
+    } else if(el.type==="node"&&el.lat!=null){
+      if((tg.historic||tg.tourism||tg.amenity)&&tg.name) pois.push({x:X(el.lon),y:Y(el.lat),name:tg.name,prio:poiPrio(tg)});
+    }
+  }
+  const bg=document.createElementNS(NS,"rect");
+  bg.setAttribute("x",-Wm); bg.setAttribute("y",-Hm);
+  bg.setAttribute("width",Wm*3); bg.setAttribute("height",Hm*3);
+  bg.setAttribute("fill","#f3f1ea");
+  L.bg.appendChild(bg);
+  const dOf=(list,close)=>list.map(p=>{
+    let d="M"+p.map(q2=>q2[0].toFixed(1)+" "+q2[1].toFixed(1)).join("L");
+    return close?d+"Z":d;
+  }).join("");
+  const addPath=(g,cls,d,extra)=>{
+    if(!d) return;
+    const p=document.createElementNS(NS,"path");
+    p.setAttribute("class",cls); p.setAttribute("d",d);
+    if(extra) for(const [k2,v] of Object.entries(extra)) p.setAttribute(k2,v);
+    g.appendChild(p);
+  };
+  addPath(L.green,"green",dOf(greens,true),{"fill-rule":"evenodd"});
+  addPath(L.green,"parking",dOf(parkings,true),{fill:"#d9dde1",stroke:"#c3c8cd","stroke-width":"0.6"});
+  addPath(L.green,"forest",dOf(forests,true),{"fill-rule":"evenodd"});
+  addPath(L.water,"water",dOf(waters.concat(waterInner),true),{"fill-rule":"evenodd"});
+  addPath(L.bld,"bld",dOf(blds.concat(bldInner),true),{"fill-rule":"evenodd"});
+  // Durchfahrten halbtransparent UEBER den Gebaeuden
+  addPath(L.passage,"passage",dOf(passages.map(r=>r.p),false),{"stroke-width":4.2});
+  addPath(L.barrier,"barrier",dOf(barriers,false));
+  addPath(L.rail,"rail",dOf(rails,false),{"stroke-width":1.6});
+  const buckets={maj:[],min:[],pth:[]};
+  for(const r of roads){
+    if(MAJ.test(r.h)) buckets.maj.push(r);
+    else if(PTH.test(r.h)) buckets.pth.push(r);
+    else buckets.min.push(r);
+  }
+  const byWidth={};
+  for(const key of ["maj","min"]){
+    for(const r of buckets[key]){
+      const w=roadW(r.h), k2=key+"|"+w;
+      (byWidth[k2]=byWidth[k2]||[]).push(r.p);
+    }
+  }
+  for(const [k2,list] of Object.entries(byWidth)){
+    const [key,w]=k2.split("|");
+    addPath(key==="maj"?L.caseMaj:L.caseMin, key==="maj"?"case-maj":"case-min", dOf(list,false), {"stroke-width":(+w)+1.8});
+  }
+  for(const [k2,list] of Object.entries(byWidth)){
+    const [key,w]=k2.split("|");
+    addPath(key==="maj"?L.roadMaj:L.roadMin, key==="maj"?"road-maj":"road-min", dOf(list,false), {"stroke-width":+w});
+  }
+  // Fusswege werden nicht mehr flaechig gerendert – nur Durchfahrten (Layer passage)
+  const named={};
+  for(const r of buckets.maj){
+    if(!r.name) continue;
+    let len=0;
+    for(let i=1;i<r.p.length;i++) len+=Math.hypot(r.p[i][0]-r.p[i-1][0],r.p[i][1]-r.p[i-1][1]);
+    if(!named[r.name]||named[r.name].len<len) named[r.name]={r,len};
+  }
+  let lblId=0;
+  for(const {r,len} of Object.values(named)){
+    if(len<60) continue;
+    let pts=r.p;
+    if(pts[pts.length-1][0]<pts[0][0]) pts=[...pts].reverse();
+    const id="rl"+(lblId++);
+    const ph=document.createElementNS(NS,"path");
+    ph.setAttribute("id",id);
+    ph.setAttribute("d","M"+pts.map(q2=>q2[0].toFixed(1)+" "+q2[1].toFixed(1)).join("L"));
+    ph.setAttribute("fill","none");
+    L.rlbl.appendChild(ph);
+    const t=document.createElementNS(NS,"text");
+    t.setAttribute("class","roadlbl");
+    const tp=document.createElementNS(NS,"textPath");
+    tp.setAttribute("href","#"+id);
+    tp.setAttribute("startOffset","50%");
+    tp.setAttribute("text-anchor","middle");
+    tp.textContent=r.name;
+    t.appendChild(tp); L.rlbl.appendChild(t);
+  }
+  // Auswahl: wichtige Merkmale zuerst, 70 m Mindestabstand, max. 25 Labels
+  pois.sort((a,b)=>b.prio-a.prio);
+  const seenPoi=new Set(), chosen=[];
+  for(const p of pois){
+    if(p.prio<=0||seenPoi.has(p.name)) continue;
+    if(chosen.some(q=>Math.hypot(q.x-p.x,q.y-p.y)<70)) continue;
+    seenPoi.add(p.name); chosen.push(p);
+    if(chosen.length>=25) break;
+  }
+  for(const p of chosen){
+    const g=document.createElementNS(NS,"g");
+    const c=document.createElementNS(NS,"circle");
+    c.setAttribute("class","poidot"); c.setAttribute("r",2.2);
+    c.setAttribute("cx",p.x); c.setAttribute("cy",p.y);
+    const t=document.createElementNS(NS,"text");
+    t.setAttribute("class","poilbl");
+    t.setAttribute("x",p.x+3.5); t.setAttribute("y",p.y+2);
+    t.textContent=p.name.length>30?p.name.slice(0,28)+"…":p.name;
+    g.appendChild(c); g.appendChild(t);
+    L.poi.appendChild(g);
+  }
+  // Sichtbarer Kartenrand: Aussenbereich abdunkeln + Rahmen
+  {
+    const M=Math.max(Wm,Hm);
+    const shade=document.createElementNS(NS,"path");
+    shade.setAttribute("d",`M${-M} ${-M}H${Wm+M}V${Hm+M}H${-M}Z M0 0V${Hm}H${Wm}V0Z`);
+    shade.setAttribute("fill","#6b7060"); shade.setAttribute("fill-opacity",".22");
+    shade.setAttribute("fill-rule","evenodd");
+    L.frame.appendChild(shade);
+    const fr=document.createElementNS(NS,"rect");
+    fr.setAttribute("x",0); fr.setAttribute("y",0);
+    fr.setAttribute("width",Wm); fr.setAttribute("height",Hm);
+    fr.setAttribute("class","framerect");
+    L.frame.appendChild(fr);
+    // Fog-of-War-Flaeche (weit ueber den Kartenrand hinaus)
+    const fw=document.getElementById("fogw");
+    fw.setAttribute("x",-M*3); fw.setAttribute("y",-M*3);
+    fw.setAttribute("width",Wm+M*6); fw.setAttribute("height",Hm+M*6);
+    fogRect=document.createElementNS(NS,"rect");
+    fogRect.setAttribute("x",-M*3); fogRect.setAttribute("y",-M*3);
+    fogRect.setAttribute("width",Wm+M*6); fogRect.setAttribute("height",Hm+M*6);
+    fogRect.setAttribute("fill","#39402f"); fogRect.setAttribute("fill-opacity",".45");
+    fogRect.setAttribute("mask","url(#fogmask)");
+    fogRect.setAttribute("pointer-events","none");
+    fogRect.style.display="none";
+    L.vision.appendChild(fogRect);
+  }
+  buildGrid(blds,bldInner,barriers,waters,waterInner,passages,forests,roads,parkings,greens);
+  generateBlocks(blds);
+  // In den Cache legen (Label: laengste benannte Strasse, sonst erstes Merkmal)
+  {
+    let best=null;
+    for(const [nm,v] of Object.entries(named)){ if(!best||v.len>best.len) best={nm,len:v.len}; }
+    const label=best?best.nm:((pois[0]&&pois[0].name)||"Bereich");
+    window.curArea={S,W,N,E,label,data};
+    if(!cached) saveCache(S,W,N,E,data,label);
+  }
+  document.getElementById("saved").style.display="none";
+  document.getElementById("ov").style.display="none";
+  document.getElementById("dt").style.display="";
+  document.getElementById("btnBox").style.display="none";
+  document.getElementById("btnBack").style.display="";
+  document.getElementById("btnMk").style.display="";
+  document.getElementById("btnStart").style.display="";
+  document.getElementById("mode").style.display="";
+  document.getElementById("btnSave").style.display="";
+  document.getElementById("colors").style.display="flex";
+  const k=Math.min(innerWidth/Wm, innerHeight/Hm)*0.95;
+  dt.minK=k*0.8; dt.maxK=90;
+  dt.k=k;
+  dt.tx=(innerWidth-Wm*k)/2; dt.ty=(innerHeight-Hm*k)/2;
+  dt.apply();
+  computeComponents();
+  drawCompOverlay();
+  lastKnow=0; lastKsig=""; visSig=""; knowImg=null;
+  updateVision();
+  const shares=grid.playable.map(id=>Math.round(grid.compSizes[id]/grid.walkable*100)+" %").join(", ");
+  setStatus("Bereich geladen. Spielbare zusammenhängende Bereiche sind eingefärbt ("+shares+"), rot = abgeschnitten. Setze Soldaten (📍) in den Bereich, in dem du spielen willst – Gegner spawnen nur dort.");
+}
+document.getElementById("btnBack").onclick=()=>{
+  document.getElementById("dt").style.display="none";
+  document.getElementById("ov").style.display="";
+  document.getElementById("btnBox").style.display="";
+  document.getElementById("btnBack").style.display="none";
+  document.getElementById("btnMk").style.display="none";
+  document.getElementById("btnStart").style.display="none";
+  document.getElementById("mode").style.display="none";
+  document.getElementById("btnSave").style.display="none";
+  document.getElementById("btnStart").textContent="▶ Start";
+  combatOn=false; phase="idle"; gameOver=false; gameMsg=""; flags=null; defusal=null;
+  if(L.obj) L.obj.innerHTML="";
+  document.getElementById("score").style.display="none";
+  document.getElementById("colors").style.display="none";
+  placeMode=false; document.getElementById("btnMk").classList.remove("active");
+  clearDetail(); area=null;
+  setStatus(null);
+  updateOvTiles();
+  renderSaved();
+};
+
+/* ============ Routing-Raster & A* ============ */
+let grid=null;
+function buildGrid(blds,bldInner,barriers,waters,waterInner,passages,forests,roads,parkings,greens){
+  const cell=Math.max(0.8, Math.max(area.Wm,area.Hm)/2000);
+  const GW=Math.max(8,Math.ceil(area.Wm/cell)), GH=Math.max(8,Math.ceil(area.Hm/cell));
+  const flags=new Uint8Array(GW*GH);
+  const bres=(pts,fn)=>{
+    for(let i=0;i<pts.length-1;i++){
+      let x0=Math.min(GW-1,Math.max(0,Math.floor(pts[i][0]/cell))), y0=Math.min(GH-1,Math.max(0,Math.floor(pts[i][1]/cell)));
+      const x1=Math.min(GW-1,Math.max(0,Math.floor(pts[i+1][0]/cell))), y1=Math.min(GH-1,Math.max(0,Math.floor(pts[i+1][1]/cell)));
+      const dx=Math.abs(x1-x0), dy=Math.abs(y1-y0), sx=x0<x1?1:-1, sy=y0<y1?1:-1;
+      let err=dx-dy;
+      for(;;){
+        fn(x0,y0);
+        if(x0===x1&&y0===y1) break;
+        const e2=2*err;
+        if(e2>-dy){err-=dy;x0+=sx;}
+        if(e2<dx){err+=dx;y0+=sy;}
+      }
+    }
+  };
+  const fill=(pts,fn)=>{
+    let mn=Infinity,mx=-Infinity;
+    for(const p of pts){ if(p[1]<mn)mn=p[1]; if(p[1]>mx)mx=p[1]; }
+    const cy0=Math.max(0,Math.floor(mn/cell)), cy1=Math.min(GH-1,Math.floor(mx/cell));
+    for(let cy=cy0;cy<=cy1;cy++){
+      const ym=(cy+0.5)*cell, xs=[];
+      for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+        const ya=pts[i][1], yb=pts[j][1];
+        if((ya>ym)!==(yb>ym)) xs.push(pts[i][0]+(ym-ya)/(yb-ya)*(pts[j][0]-pts[i][0]));
+      }
+      xs.sort((a,b)=>a-b);
+      for(let k2=0;k2+1<xs.length;k2+=2){
+        const a=Math.max(0,Math.floor(xs[k2]/cell)), b=Math.min(GW-1,Math.floor(xs[k2+1]/cell));
+        for(let cx=a;cx<=b;cx++) fn(cy*GW+cx);
+      }
+    }
+  };
+  // Bits: 1 blockiert (Gebaeude) · 2 Barriere · 4 sichtblockierend (Gebaeude)
+  //       8 Wasser (extrem langsam) · 16 Wald (Sicht gedaempft, langsamer) · 32 Strasse/Weg (schneller)
+  const stamp=(rr,val,clearMask)=>(x,y)=>{
+    for(let dy=-rr;dy<=rr;dy++) for(let dx=-rr;dx<=rr;dx++){
+      if(dx*dx+dy*dy>rr*rr) continue;
+      const nx=x+dx, ny=y+dy;
+      if(nx<0||ny<0||nx>=GW||ny>=GH) continue;
+      if(clearMask) flags[ny*GW+nx]&=~clearMask;
+      if(val) flags[ny*GW+nx]|=val;
+    }
+  };
+  for(const p of (greens||[])){ fill(p,i=>flags[i]|=128); }   // Wiesen/Gruen: langsamer als Wege
+  for(const p of forests){ fill(p,i=>flags[i]|=16); }
+  for(const p of blds){ fill(p,i=>flags[i]|=5); bres(p,(x,y)=>flags[y*GW+x]|=5); }
+  for(const p of bldInner) fill(p,i=>flags[i]&=~5);           // Innenhoefe begehbar
+  for(const p of waters){ fill(p,i=>flags[i]|=8); bres(p,(x,y)=>flags[y*GW+x]|=8); }
+  for(const p of waterInner) fill(p,i=>flags[i]&=~8);         // Inseln
+  // Strassen/Wege als schnelle Korridore stempeln; echte Fahrstrassen zusaetzlich
+  // mit Bit 64 (Blockgrenze) – Zufahrten (service) und Fusswege begrenzen KEINE Bloecke
+  for(const r of roads){
+    const w=PTH.test(r.h)?2:roadW(r.h);
+    const isStreet=!PTH.test(r.h)&&!/^service$/.test(r.h);
+    bres(r.p, stamp(Math.max(1,Math.round(w/2/cell)),isStreet?96:32,0));
+  }
+  // Parkplaetze: versiegelte Flaeche, zaehlt wie Weg (schnell, keine Gartenflaeche, Blockgrenze)
+  for(const p of (parkings||[])){ fill(p,i=>{ if(!(flags[i]&1)) flags[i]|=32; }); }
+  // Durchfahrten: Korridor durch Gebaeude freischneiden (~2,5 m Radius), gelten als Weg
+  const rr=Math.max(1,Math.round(2.5/cell));
+  for(const r of passages) bres(r.p, stamp(rr,32,5));
+  const btype=new Uint8Array(GW*GH);   // 0 unbekannt · 1 Zaun · 2 Hecke · 3 Mauer
+  for(const p of barriers) bres(p,(x,y)=>{ if(!(flags[y*GW+x]&1)){ flags[y*GW+x]|=2; btype[y*GW+x]=1; } });
+  grid={flags,GW,GH,cell,btype,pth:roads.filter(r=>PTH.test(r.h)).map(r=>r.p)};
+}
+/* Barriere-Typen: [Kletterdauer s, Hoerweite m] – Zaun schnell aber laut,
+   Mauer langsam aber leise, Hecke dazwischen (0 = unbekannt/OSM-Default) */
+const BARRTYP={0:[3.5,40],1:[2.5,60],2:[3.5,40],3:[5,25]};
+/* Zusammenhaengende begehbare Bereiche: nur Bereiche >=10 % sind spielbar */
+function computeComponents(){
+  const {flags,GW,GH}=grid;
+  const comp=new Int32Array(GW*GH).fill(-1);
+  const sizes=[];
+  const stack=new Int32Array(GW*GH);
+  let walkable=0;
+  for(let i=0;i<GW*GH;i++) if(!(flags[i]&1)) walkable++;
+  for(let i=0;i<GW*GH;i++){
+    if((flags[i]&1)||comp[i]!==-1) continue;
+    const id=sizes.length;
+    let sp=0, size=0;
+    stack[sp++]=i; comp[i]=id;
+    while(sp>0){
+      const c=stack[--sp]; size++;
+      const cx=c%GW, cy=(c/GW)|0;
+      if(cx>0){ const n=c-1; if(!(flags[n]&1)&&comp[n]===-1){ comp[n]=id; stack[sp++]=n; } }
+      if(cx<GW-1){ const n=c+1; if(!(flags[n]&1)&&comp[n]===-1){ comp[n]=id; stack[sp++]=n; } }
+      if(cy>0){ const n=c-GW; if(!(flags[n]&1)&&comp[n]===-1){ comp[n]=id; stack[sp++]=n; } }
+      if(cy<GH-1){ const n=c+GW; if(!(flags[n]&1)&&comp[n]===-1){ comp[n]=id; stack[sp++]=n; } }
+    }
+    sizes.push(size);
+  }
+  const playable=[];
+  for(let id=0;id<sizes.length;id++) if(sizes[id]>=walkable*0.10) playable.push(id);
+  playable.sort((a,b)=>sizes[b]-sizes[a]);
+  grid.comp=comp; grid.compSizes=sizes; grid.walkable=walkable; grid.playable=playable;
+}
+/* ===== Parzellen-Pipeline v2 (nach User-Skizzen) =====
+   Schritt 1: Bloecke = von Strassen (und Wasser) umschlossene Zusammenhangsflaechen.
+   Schritt 2: Haeuser (35-400 m²) je Block.
+   Schritt 3: "Gruene Linie" = Hintergarten-Trennlinie: Pfad von Blockende zu
+   Blockende, der zwischen sich gegenueberstehenden Haeusern mittig laeuft
+   (Kosten steigen nahe Gebaeuden -> rote Anker automatisch) und Luecken
+   gerade interpoliert (dort sind die Kosten flach -> kuerzester Weg). */
+function generateBlocks(blds){
+  if(!grid) return;
+  const {flags,GW,GH,cell}=grid;
+  const N=GW*GH;
+  L.fence.innerHTML="";
+  // Haeuser
+  const houses=[];
+  for(const p of blds){
+    if(!p||p.length<3) continue;
+    let a2=0,cx=0,cy=0;
+    for(let i=0,j=p.length-1;i<p.length;j=i++){
+      const cr=p[j][0]*p[i][1]-p[i][0]*p[j][1];
+      a2+=cr; cx+=(p[j][0]+p[i][0])*cr; cy+=(p[j][1]+p[i][1])*cr;
+    }
+    if(a2===0) continue;
+    const A=Math.abs(a2/2);
+    if(A<55||A>420) continue;                 // 55 m²: groessere Garagen zaehlen nicht als Haus
+    houses.push({p,cx:cx/(3*a2),cy:cy/(3*a2)});
+  }
+  // Bloecke fluten (Grenze = Strasse/Wasser); Rand-beruehrende Bloecke sind "aussen"
+  const blk=new Int32Array(N).fill(-1);
+  const q=new Int32Array(N);
+  const isBound=i=>(flags[i]&(8|64))!==0;   // nur Wasser + echte Fahrstrassen begrenzen Bloecke
+  const sizes=[], edgeTouch=[];
+  for(let s=0;s<N;s++){
+    if(blk[s]>=0||isBound(s)) continue;
+    const id=sizes.length;
+    let qh=0,qt=0,cnt=0,edge=false;
+    q[qt++]=s; blk[s]=id;
+    while(qh<qt){
+      const i=q[qh++]; cnt++;
+      const x=i%GW,y=(i/GW)|0;
+      if(x===0||y===0||x===GW-1||y===GH-1) edge=true;
+      if(x>0){const nn=i-1; if(blk[nn]<0&&!isBound(nn)){blk[nn]=id;q[qt++]=nn;}}
+      if(x<GW-1){const nn=i+1; if(blk[nn]<0&&!isBound(nn)){blk[nn]=id;q[qt++]=nn;}}
+      if(y>0){const nn=i-GW; if(blk[nn]<0&&!isBound(nn)){blk[nn]=id;q[qt++]=nn;}}
+      if(y<GH-1){const nn=i+GW; if(blk[nn]<0&&!isBound(nn)){blk[nn]=id;q[qt++]=nn;}}
+    }
+    sizes.push(cnt); edgeTouch.push(edge);
+  }
+  // Haus -> Block
+  const byBlk=new Map();
+  for(const h of houses){
+    const i=Math.min(GH-1,Math.max(0,(h.cy/cell)|0))*GW+Math.min(GW-1,Math.max(0,(h.cx/cell)|0));
+    const id=blk[i];
+    if(id<0) continue;
+    h.blk=id;
+    let a=byBlk.get(id); if(!a){a=[];byBlk.set(id,a);}
+    a.push(h);
+  }
+  const CHECK=true;   // Kontroll-Ansicht: X + Blockumrandung + Mittellinien-Anker
+  // Schema "Wohnblock": >=4 Haeuser, geschlossen, nicht riesig, dicht genug bebaut
+  const qualM=new Uint8Array(sizes.length);
+  for(const [id,hs] of byBlk){
+    const areaM2=sizes[id]*cell*cell;
+    if(hs.length>=4&&!edgeTouch[id]&&areaM2<=150000&&areaM2/hs.length<=6000) qualM[id]=1;
+  }
+  // Abstand zur naechsten Gebaeudezelle (in Zellen), blockintern (Strassen stoppen)
+  const dB=new Int32Array(N).fill(-1);
+  {
+    let qt=0;
+    for(let i=0;i<N;i++) if((flags[i]&1)&&!isBound(i)){ dB[i]=0; q[qt++]=i; }
+    let qh=0;
+    while(qh<qt){
+      const i=q[qh++], d=dB[i], x=i%GW, y=(i/GW)|0;
+      if(x>0){const nn=i-1; if(dB[nn]<0&&!isBound(nn)){dB[nn]=d+1;q[qt++]=nn;}}
+      if(x<GW-1){const nn=i+1; if(dB[nn]<0&&!isBound(nn)){dB[nn]=d+1;q[qt++]=nn;}}
+      if(y>0){const nn=i-GW; if(dB[nn]<0&&!isBound(nn)){dB[nn]=d+1;q[qt++]=nn;}}
+      if(y<GH-1){const nn=i-0+GW; if(dB[nn]<0&&!isBound(nn)){dB[nn]=d+1;q[qt++]=nn;}}
+    }
+  }
+  // Abstand zur Blockgrenze (Strasse/Wasser) – die Linie soll auch von Strassen wegbleiben
+  const dR=new Int32Array(N).fill(-1);
+  {
+    let qt=0;
+    for(let i=0;i<N;i++){
+      if(isBound(i)||blk[i]<0) continue;
+      const x=i%GW,y=(i/GW)|0;
+      const nearB=(x>0&&isBound(i-1))||(x<GW-1&&isBound(i+1))||(y>0&&isBound(i-GW))||(y<GH-1&&isBound(i+GW))||x===0||y===0||x===GW-1||y===GH-1;
+      if(nearB){ dR[i]=0; q[qt++]=i; }
+    }
+    let qh=0;
+    while(qh<qt){
+      const i=q[qh++], d=dR[i], x=i%GW, y=(i/GW)|0;
+      if(x>0){const nn=i-1; if(dR[nn]<0&&!isBound(nn)&&blk[nn]>=0){dR[nn]=d+1;q[qt++]=nn;}}
+      if(x<GW-1){const nn=i+1; if(dR[nn]<0&&!isBound(nn)&&blk[nn]>=0){dR[nn]=d+1;q[qt++]=nn;}}
+      if(y>0){const nn=i-GW; if(dR[nn]<0&&!isBound(nn)&&blk[nn]>=0){dR[nn]=d+1;q[qt++]=nn;}}
+      if(y<GH-1){const nn=i+GW; if(dR[nn]<0&&!isBound(nn)&&blk[nn]>=0){dR[nn]=d+1;q[qt++]=nn;}}
+    }
+  }
+  const tmpD=new Int32Array(N);
+  const walkable=i=>blk[i]>=0&&!(flags[i]&1);
+  // geodätisch entferntester Punkt (BFS innerhalb des Blocks, Gebaeude blockieren)
+  function far(start,id){
+    tmpD.fill(-1);
+    let qh=0,qt=0,last=start;
+    tmpD[start]=0; q[qt++]=start;
+    while(qh<qt){
+      const i=q[qh++]; last=i;
+      const x=i%GW,y=(i/GW)|0;
+      const step=nn=>{ if(tmpD[nn]<0&&blk[nn]===id&&!(flags[nn]&1)){tmpD[nn]=tmpD[i]+1;q[qt++]=nn;} };
+      if(x>0)step(i-1); if(x<GW-1)step(i+1); if(y>0)step(i-GW); if(y<GH-1)step(i+GW);
+    }
+    return last;
+  }
+  window.blockLines=[];   // fuer die naechsten Schritte aufgehoben
+  for(const [id,hs] of byBlk){
+    if(!qualM[id]) continue;
+    // Startpunkt: offenste Stelle des Blocks (max. Gebaeudeabstand)
+    let m=-1,bd=-1;
+    for(let i=0;i<N;i++) if(blk[i]===id&&!(flags[i]&1)&&dB[i]>bd){ bd=dB[i]; m=i; }
+    if(m<0) continue;
+    const e1=far(m,id), e2=far(e1,id);
+    // Dijkstra e1 -> e2: Kosten hoch nahe Gebaeuden -> Pfad laeuft mittig zwischen den Reihen
+    if(!fpG||fpG.length!==N){ fpG=new Float64Array(N); fpCame=new Int32Array(N); fpVer=new Int32Array(N); fpClosedV=new Int32Array(N); fpVerN=0; }
+    const ver=++fpVerN;
+    const heap=[];
+    const push=(f,i)=>{ heap.push([f,i]); let c=heap.length-1; while(c>0){const pp=(c-1)>>1; if(heap[pp][0]<=heap[c][0])break; const t=heap[pp];heap[pp]=heap[c];heap[c]=t; c=pp;} };
+    const pop=()=>{ const top=heap[0], last=heap.pop(); if(heap.length){ heap[0]=last; let c=0; for(;;){ let l=2*c+1,r2=l+1,mm=c; if(l<heap.length&&heap[l][0]<heap[mm][0])mm=l; if(r2<heap.length&&heap[r2][0]<heap[mm][0])mm=r2; if(mm===c)break; const t=heap[mm];heap[mm]=heap[c];heap[c]=t; c=mm; } } return top; };
+    fpVer[e1]=ver; fpG[e1]=0; fpCame[e1]=-1; push(0,e1);
+    let found=false;
+    while(heap.length){
+      const [,i]=pop();
+      if(fpClosedV[i]===ver) continue;
+      fpClosedV[i]=ver;
+      if(i===e2){found=true;break;}
+      const x=i%GW,y=(i/GW)|0, gi=fpG[i];
+      const step=nn=>{
+        if(blk[nn]!==id||(flags[nn]&1)) return;
+        const dm=dB[nn]*cell, rm=Math.max(0,dR[nn])*cell;
+        // teuer nahe Gebaeuden UND nahe Strassen -> Linie bleibt mittig
+        const ng=gi+cell*(1+60/(1+dm)+60/(1+rm));
+        const old=fpVer[nn]===ver?fpG[nn]:Infinity;
+        if(ng<old-1e-9){ fpVer[nn]=ver; fpG[nn]=ng; fpCame[nn]=i; push(ng,nn); }
+      };
+      if(x>0)step(i-1); if(x<GW-1)step(i+1); if(y>0)step(i-GW); if(y<GH-1)step(i+GW);
+    }
+    if(!found) continue;
+    const pts=[];
+    for(let i=e2;i!==-1;i=fpCame[i]) pts.push([((i%GW)+0.5)*cell,(((i/GW)|0)+0.5)*cell]);
+    pts.reverse();
+    window.blockLines.push({blk:id,pts,houses:hs});
+    if(!CHECK){
+      // Anzeige: gruene gestrichelte Trennlinie
+      let d="";
+      for(let k=0;k<pts.length;k+=3) d+=(d?"L":"M")+pts[k][0].toFixed(1)+" "+pts[k][1].toFixed(1);
+      const el=document.createElementNS(NS,"path");
+      el.setAttribute("d",d);
+      el.setAttribute("fill","none");
+      el.setAttribute("stroke","#2f8f2f");
+      el.setAttribute("stroke-width","1.4");
+      el.setAttribute("stroke-dasharray","6 4");
+      el.setAttribute("opacity",".95");
+      L.fence.appendChild(el);
+    }
+  }
+  if(CHECK){
+    /* ===== PRODUKTIV: Analyse liefert Grenz-Polylinien (orange Fluchten samt
+       Interpolation, gelbe Mittellinien, blaue Quergrenzen). Diese werden unten
+       zu 80 % mit Zaun/Hecke/Mauer bebaut. Fusswege werden normale Wege. ===== */
+    const boundaryRuns=[];   // {g:Grenz-ID, pts:[[x,y],...]} in Zellschritten
+    let gid=0;
+    let dPath="";            // Fussweg-Darstellung (kein Hindernis)
+    /* Gruene Kanten (User-Verfahren): alle Polygonkanten unmarkierter Gebaeude in
+       qualifizierten Bloecken, die +-30 Grad parallel zum lokalen Strassenverlauf
+       liegen (lokale Richtung = Tangente der Blockmittellinie). */
+    const lineByBlk=new Map(window.blockLines.map(o=>[o.blk,o]));
+    let dGrn="";
+    window.edgeHints=[];
+    let bidC=0;
+    for(const p of blds){
+      if(!p||p.length<3) continue;
+      let a2=0,scx=0,scy=0;
+      for(let i=0,j=p.length-1;i<p.length;j=i++){
+        const cr=p[j][0]*p[i][1]-p[i][0]*p[j][1];
+        a2+=cr; scx+=(p[j][0]+p[i][0])*cr; scy+=(p[j][1]+p[i][1])*cr;
+      }
+      if(a2===0) continue;
+      const A=Math.abs(a2/2);
+      if(A<6||A>=55) continue;                   // nur unmarkierte Nebengebaeude
+      scx/=3*a2; scy/=3*a2;
+      const ci=Math.min(GH-1,Math.max(0,(scy/cell)|0))*GW+Math.min(GW-1,Math.max(0,(scx/cell)|0));
+      const id=blk[ci];
+      if(id<0||!qualM[id]) continue;
+      const bl=lineByBlk.get(id);
+      if(!bl) continue;
+      // lokale Strassenrichtung: Tangente der Mittellinie am naechsten Punkt
+      let bi=0,bd2=1e18;
+      for(let k=0;k<bl.pts.length;k+=2){
+        const ddx=bl.pts[k][0]-scx, ddy=bl.pts[k][1]-scy, d2=ddx*ddx+ddy*ddy;
+        if(d2<bd2){ bd2=d2; bi=k; }
+      }
+      const k1=Math.max(0,bi-6), k2=Math.min(bl.pts.length-1,bi+6);
+      let tx=bl.pts[k2][0]-bl.pts[k1][0], ty=bl.pts[k2][1]-bl.pts[k1][1];
+      const tl=Math.hypot(tx,ty)||1; tx/=tl; ty/=tl;
+      const bid=bidC++;
+      for(let i=0;i<p.length-1;i++){
+        const ex=p[i+1][0]-p[i][0], ey=p[i+1][1]-p[i][1];
+        const el2=Math.hypot(ex,ey);
+        if(el2<2) continue;                      // Mini-Kanten ignorieren
+        const dot=Math.abs((ex*tx+ey*ty)/el2);
+        if(dot<0.866) continue;                  // nicht +-30 Grad strassenparallel
+        window.edgeHints.push({x1:p[i][0],y1:p[i][1],x2:p[i+1][0],y2:p[i+1][1],blk:id,bid});
+        dGrn+="M"+p[i][0].toFixed(1)+" "+p[i][1].toFixed(1)+"L"+p[i+1][0].toFixed(1)+" "+p[i+1][1].toFixed(1);
+      }
+    }
+    /* Priorisierung (User-Verfahren): Kanten MEHRERER Gebaeude, die auf ein und
+       derselben Linie liegen, stuetzen diese Linie. Strassen hier als ~gerade
+       angenommen: Projektion auf die Block-Hauptachse, 1D-Clustern der Offsets;
+       Cluster mit >=3 verschiedenen Gebaeuden -> durchgezogene HELLGRUENE Linie. */
+    const edgesByBlk=new Map();
+    for(const h of window.edgeHints){
+      let a=edgesByBlk.get(h.blk); if(!a){a=[];edgesByBlk.set(h.blk,a);}
+      a.push(h);
+    }
+    let dLight="";
+    window.mainLines=[];
+    const orangeBlocks=new Set();
+    // Langlinien (orange Fluchten, Fusswege, gelbe Mittellinien) fuer die Quergrenzen sammeln
+    const longByBlk=new Map();
+    const addLong=(bid2,pts)=>{
+      if(!pts||pts.length<3) return;
+      let a=longByBlk.get(bid2); if(!a){a=[];longByBlk.set(bid2,a);}
+      a.push(pts);
+    };
+    /* Greedy-Kettenwachstum: Linie startet an der laengsten freien Kante und darf
+       nur Kanten anketten, die (a) <=15 Grad zur Linie stehen, (b) mit beiden
+       Endpunkten <=1.8 m an ihr liegen und (c) hoechstens 35 m Luecke zur bisherigen
+       Stuetzung haben. Verhindert Zufalls-Kollinearitaet quer durch grosse Bloecke. */
+    for(const [id,edges] of edgesByBlk){
+      if(edges.length<3) continue;
+      const oranges=[];
+      const E=edges.map(e=>({x1:e.x1,y1:e.y1,x2:e.x2,y2:e.y2,bid:e.bid,
+        len:Math.hypot(e.x2-e.x1,e.y2-e.y1),used:false})).sort((a,b)=>b.len-a.len);
+      /* Kandidatenlinien sind IMMER die Verlaengerungen echter Kanten (Anfangs- und
+         Endpunkt einer dunkelgruenen Kante definieren die Linie -> exakt parallel).
+         Gewaehlt wird je Runde die Kantenlinie, die die meisten Gebaeude trifft. */
+      const evalSeed=seed=>{
+        const fx=(seed.x2-seed.x1)/seed.len, fy=(seed.y2-seed.y1)/seed.len;
+        const px=seed.x1, py=seed.y1;
+        const distLn=(x,y)=>Math.abs(-(x-px)*fy+(y-py)*fx);
+        const proj=(x,y)=>(x-px)*fx+(y-py)*fy;
+        const cand=[];
+        for(const c of E){
+          if(c.used) continue;
+          const cd=Math.abs(((c.x2-c.x1)*fx+(c.y2-c.y1)*fy)/c.len);
+          if(cd<0.985) continue;                              // <=10 Grad: wirklich parallel
+          // streng: max 0,75 m Versatz – staerker abweichende Kanten sind KEINE gemeinsame Grenze
+          if(distLn(c.x1,c.y1)>0.75||distLn(c.x2,c.y2)>0.75) continue;
+          cand.push({e:c,lo:Math.min(proj(c.x1,c.y1),proj(c.x2,c.y2)),hi:Math.max(proj(c.x1,c.y1),proj(c.x2,c.y2))});
+        }
+        cand.sort((a,b)=>a.lo-b.lo);
+        // zusammenhaengende Kette um den Seed (Luecken <=35 m)
+        const si=cand.findIndex(c=>c.e===seed);
+        if(si<0) return null;
+        const chain=[cand[si]];
+        for(let i=si-1;i>=0;i--){ if(chain[0].lo-cand[i].hi<=35) chain.unshift(cand[i]); else break; }
+        for(let i=si+1;i<cand.length;i++){ if(cand[i].lo-chain[chain.length-1].hi<=35) chain.push(cand[i]); else break; }
+        return {seed,fx,fy,px,py,chain,bids:new Set(chain.map(c=>c.e.bid))};
+      };
+      for(;;){
+        let best=null;
+        for(const seed of E){
+          if(seed.used) continue;
+          const r=evalSeed(seed);
+          if(!r||r.bids.size<3) continue;
+          const lenSum=r.chain.reduce((s,c)=>s+c.e.len,0);
+          if(!best||r.bids.size>best.bids.size||(r.bids.size===best.bids.size&&lenSum>best.lenSum))
+            best={...r,lenSum};
+        }
+        if(!best) break;
+        for(const c of best.chain) c.e.used=true;
+        const t0=best.chain[0].lo, t1=best.chain[best.chain.length-1].hi;
+        const {px,py,fx,fy}=best;
+        /* Kontext-Pruefung (User-Regel): eine echte Grundstuecksgrenze hat auf BEIDEN
+           Seiten quer zur Linie sowohl eine Strasse als auch Haeuser, und die
+           Plus/Minus-Abstaende eines Paares weichen nicht um Faktor 10 ab. */
+        const nx2=-fy, ny2=fx;
+        const rayD=(sx,sy,dx2,dy2)=>{
+          for(let d=cell;d<=150;d+=cell){
+            const gx2=((sx+dx2*d)/cell)|0, gy2=((sy+dy2*d)/cell)|0;
+            if(gx2<0||gy2<0||gx2>=GW||gy2>=GH) return -1;
+            if(isBound(gy2*GW+gx2)) return d;
+          }
+          return -1;
+        };
+        let sPlus=1e9,sMinus=1e9;
+        for(const fr of [0.25,0.5,0.75]){
+          const sx=px+fx*(t0+(t1-t0)*fr), sy=py+fy*(t0+(t1-t0)*fr);
+          const a=rayD(sx,sy,nx2,ny2), b=rayD(sx,sy,-nx2,-ny2);
+          if(a>0) sPlus=Math.min(sPlus,a);
+          if(b>0) sMinus=Math.min(sMinus,b);
+        }
+        let ok=sPlus<1e9&&sMinus<1e9&&Math.max(sPlus,sMinus)<=10*Math.min(sPlus,sMinus);
+        if(ok){
+          let hPlus=1e9,hMinus=1e9;
+          for(const h of (byBlk.get(id)||[])){
+            const tt=(h.cx-px)*fx+(h.cy-py)*fy;
+            if(tt<t0-10||tt>t1+10) continue;                 // nur angrenzende Haeuser
+            const off=(h.cx-px)*nx2+(h.cy-py)*ny2;
+            if(off>0.5) hPlus=Math.min(hPlus,off);
+            else if(off<-0.5) hMinus=Math.min(hMinus,-off);
+          }
+          ok=hPlus<60&&hMinus<60&&Math.max(hPlus,hMinus)<=10*Math.min(hPlus,hMinus);
+        }
+        window.mainLines.push({blk:id,ax:px+fx*t0,ay:py+fy*t0,bx:px+fx*t1,by:py+fy*t1,support:best.bids.size,valid:ok});
+        if(!ok) continue;                                    // falsche Kandidaten ausblenden
+        oranges.push({px,py,fx,fy,t0,t1,support:best.bids.size,lenSum:best.lenSum});
+      }
+      /* Querungs-Check: Linie darf nicht DURCH ein HAUS (X-Gebaeude) laufen –
+         entlang von Garagenwaenden ist ausdruecklich ok (das sind die Stuetzen).
+         Polygon-genauer Test gegen die erkannten Haeuser des Blocks. */
+      const cellAt=(x,y)=>{
+        const gx=(x/cell)|0, gy=(y/cell)|0;
+        if(gx<0||gy<0||gx>=GW||gy>=GH) return -1;
+        return gy*GW+gx;
+      };
+      const houseList=(byBlk.get(id)||[]).map(h=>{
+        let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18;
+        for(const q2 of h.p){ if(q2[0]<x0)x0=q2[0]; if(q2[0]>x1)x1=q2[0]; if(q2[1]<y0)y0=q2[1]; if(q2[1]>y1)y1=q2[1]; }
+        return {p:h.p,x0,y0,x1,y1};
+      });
+      const inHouse=(x,y)=>{
+        for(const hl of houseList){
+          if(x<hl.x0||x>hl.x1||y<hl.y0||y>hl.y1) continue;
+          let inside=false;
+          const p=hl.p;
+          for(let i2=0,j2=p.length-1;i2<p.length;j2=i2++){
+            if((p[i2][1]>y)!==(p[j2][1]>y)&&x<p[i2][0]+(y-p[i2][1])/(p[j2][1]-p[i2][1])*(p[j2][0]-p[i2][0])) inside=!inside;
+          }
+          if(inside) return true;
+        }
+        return false;
+      };
+      const crossesHouse=(px,py,fx,fy,t0,t1)=>{
+        let run=0;
+        for(let t=t0;t<=t1;t+=cell){
+          if(inHouse(px+fx*t,py+fy*t)){ run+=cell; if(run>2) return true; }
+          else run=0;
+        }
+        return false;
+      };
+      const pathOK=(x1,y1,x2,y2)=>{           // Verbinder: im Block, keine Strasse, kein Haus
+        const L2=Math.hypot(x2-x1,y2-y1);
+        if(L2<0.5) return true;
+        const ux=(x2-x1)/L2, uy=(y2-y1)/L2;
+        let run=0;
+        for(let t=0;t<=L2;t+=cell){
+          const x=x1+ux*t, y=y1+uy*t;
+          const i=cellAt(x,y);
+          if(i<0||(blk[i]!==id&&!(flags[i]&1))) return false;
+          if(isBound(i)) return false;
+          if(inHouse(x,y)){ run+=cell; if(run>2) return false; }
+          else run=0;
+        }
+        return true;
+      };
+      // 1. Haus-Querer raus, 2. Parallel-Duplikate: staerkste Kollinearitaet gewinnt
+      const clean=oranges.filter(o=>!crossesHouse(o.px,o.py,o.fx,o.fy,o.t0,o.t1))
+        .sort((a,b)=>b.support-a.support||b.lenSum-a.lenSum);
+      const kept=[];
+      for(const o of clean){
+        let dup=false;
+        for(const k of kept){
+          if(Math.abs(o.fx*k.fx+o.fy*k.fy)<0.966) continue;
+          const mx2=o.px+o.fx*(o.t0+o.t1)/2, my2=o.py+o.fy*(o.t0+o.t1)/2;
+          if(Math.abs(-(mx2-k.px)*k.fy+(my2-k.py)*k.fx)>12) continue;   // "gleiche Hoehe": bis 12 m Versatz
+          const pj=(x,y)=>(x-k.px)*k.fx+(y-k.py)*k.fy;
+          const oa=Math.min(pj(o.px+o.fx*o.t0,o.py+o.fy*o.t0),pj(o.px+o.fx*o.t1,o.py+o.fy*o.t1));
+          const ob=Math.max(pj(o.px+o.fx*o.t0,o.py+o.fy*o.t0),pj(o.px+o.fx*o.t1,o.py+o.fy*o.t1));
+          if(Math.min(ob,k.t1)-Math.max(oa,k.t0)>1){ dup=true; break; }
+        }
+        if(!dup) kept.push(o);
+      }
+      // Zeichnen: IMMER geclippt auf Blockzellen UND gegen Haus-Polygone –
+      // egal woher ein Segment stammt, im Haus wird nie gezeichnet
+      const drawSeg=(x1,y1,x2,y2,g)=>{
+        const L2=Math.hypot(x2-x1,y2-y1);
+        if(L2<0.3) return;
+        const ux=(x2-x1)/L2, uy=(y2-y1)/L2;
+        let cur=null;
+        for(let t=0;t<=L2;t+=cell){
+          const x=x1+ux*t, y=y1+uy*t;
+          const i=cellAt(x,y);
+          const inside=i>=0&&blk[i]===id&&!inHouse(x,y);
+          if(inside){ if(!cur) cur=[]; cur.push([x,y]); }
+          else { if(cur&&cur.length>2) boundaryRuns.push({g,pts:cur}); cur=null; }
+        }
+        if(cur&&cur.length>2) boundaryRuns.push({g,pts:cur});
+      };
+      for(const o of kept){
+        const [ax,ay]=[o.px+o.fx*o.t0,o.py+o.fy*o.t0];
+        const [bx,by]=[o.px+o.fx*o.t1,o.py+o.fy*o.t1];
+        drawSeg(ax,ay,bx,by,++gid);
+        const lp=[];
+        for(let t=o.t0;t<=o.t1;t+=2) lp.push([o.px+o.fx*t,o.py+o.fy*t]);
+        addLong(id,lp);
+      }
+      // 3. Interpolation: fluchtende orange Linien mit einfachen geraden Verbindern
+      //    koppeln; welche Enden verbunden wurden, wird vermerkt
+      const endPt=(o,s)=>[o.px+o.fx*(s?o.t1:o.t0), o.py+o.fy*(s?o.t1:o.t0)];
+      for(let i=0;i<kept.length;i++) for(let j=i+1;j<kept.length;j++){
+        const a=kept[i], b=kept[j];
+        if(Math.abs(a.fx*b.fx+a.fy*b.fy)<0.966) continue;
+        let bd=1e18,sA=0,sB=0;
+        for(const s1 of [0,1]) for(const s2 of [0,1]){
+          const e1=endPt(a,s1), e2=endPt(b,s2);
+          const d=Math.hypot(e1[0]-e2[0],e1[1]-e2[1]);
+          if(d<bd){ bd=d; sA=s1; sB=s2; }
+        }
+        if(bd>60) continue;
+        const pA=endPt(a,sA), pB=endPt(b,sB);
+        const lat=Math.abs(-(pB[0]-a.px)*a.fy+(pB[1]-a.py)*a.fx);
+        if(lat>8) continue;
+        if(!pathOK(pA[0],pA[1],pB[0],pB[1])) continue;
+        drawSeg(pA[0],pA[1],pB[0],pB[1],++gid);
+        if(sA) a.conn1=true; else a.conn0=true;
+        if(sB) b.conn1=true; else b.conn0=true;
+      }
+      // 4. Unverbundene Enden geradeaus bis zur Strasse verlaengern (Grenze wird
+      //    durchgehend von Strasse zu Strasse) – nur wenn der Weg gueltig bleibt
+      for(const o of kept){
+        for(const s of [0,1]){
+          if(s?o.conn1:o.conn0) continue;
+          const [sx,sy]=endPt(o,s);
+          const dirx=o.fx*(s?1:-1), diry=o.fy*(s?1:-1);
+          let hit=-1;
+          for(let t=cell;t<=60;t+=cell){
+            const i=cellAt(sx+dirx*t,sy+diry*t);
+            if(i<0){ break; }
+            if(isBound(i)){ hit=t-cell; break; }
+            if(blk[i]!==id&&!(flags[i]&1)) break;
+          }
+          if(hit<2) continue;
+          const tx2=sx+dirx*hit, ty2=sy+diry*hit;
+          if(!pathOK(sx,sy,tx2,ty2)) continue;
+          drawSeg(sx,sy,tx2,ty2,++gid);
+        }
+      }
+      if(kept.length) orangeBlocks.add(id);
+    }
+    /* Fusswege DURCH Wohnbloecke sind bestaetigte Grundstuecksgrenzen (OSM-Referenz);
+       neben Strassen bleiben sie unsichtbar. ABER: Bloecke mit VIEL Fussweg
+       (Friedhof/Park-Wegenetz) komplett auslassen - dort sind Wege keine Grenzen. */
+    if(grid.pth){
+      // LOKALE Fussweg-Dichte (12-m-Raster, 5x5-Umkreis ~ +-30 m): Wegenetz-Knaeuel
+      // (Friedhof/Park) werden nur DORT uebersprungen; einzelne Wege - auch mehrere
+      // im selben Block - bleiben als Grenze erhalten
+      const CS=12;
+      const DW=Math.max(1,Math.ceil(GW*cell/CS)), DH=Math.max(1,Math.ceil(GH*cell/CS));
+      const dens=new Float32Array(DW*DH);
+      for(const pp of grid.pth){
+        for(let s2=0;s2<pp.length-1;s2++){
+          const L2=Math.hypot(pp[s2+1][0]-pp[s2][0],pp[s2+1][1]-pp[s2][1]);
+          if(L2<0.5) continue;
+          const ux=(pp[s2+1][0]-pp[s2][0])/L2, uy=(pp[s2+1][1]-pp[s2][1])/L2;
+          for(let t=0;t<=L2;t+=cell*2){
+            const cx=((pp[s2][0]+ux*t)/CS)|0, cy=((pp[s2][1]+uy*t)/CS)|0;
+            if(cx>=0&&cy>=0&&cx<DW&&cy<DH) dens[cy*DW+cx]+=cell*2;
+          }
+        }
+      }
+      const localDens=(x,y)=>{
+        const cx=(x/CS)|0, cy=(y/CS)|0;
+        let s=0;
+        for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){
+          const nx=cx+dx, ny=cy+dy;
+          if(nx<0||ny<0||nx>=DW||ny>=DH) continue;
+          s+=dens[ny*DW+nx];
+        }
+        return s;
+      };
+      const blkAt=(x,y)=>{
+        const gx=(x/cell)|0, gy=(y/cell)|0;
+        if(gx<0||gy<0||gx>=GW||gy>=GH) return -1;
+        return blk[gy*GW+gx];
+      };
+      for(const pp of grid.pth){
+        for(let s2=0;s2<pp.length-1;s2++){
+          const L2=Math.hypot(pp[s2+1][0]-pp[s2][0],pp[s2+1][1]-pp[s2][1]);
+          if(L2<0.5) continue;
+          const ux=(pp[s2+1][0]-pp[s2][0])/L2, uy=(pp[s2+1][1]-pp[s2][1])/L2;
+          // Fusswege sind KEINE Grenzen (Userentscheid): sichtbarer normaler Weg,
+          // bleiben aber Referenz-Langlinien fuer die Quergrenzen
+          let run=false, curRun=null, curBlk=-1;
+          for(let t=0;t<=L2;t+=cell){
+            const x=pp[s2][0]+ux*t, y=pp[s2][1]+uy*t;
+            const b=blkAt(x,y);
+            const ok2=b>=0&&qualM[b]&&localDens(x,y)<=150;
+            if(ok2&&!run){ dPath+="M"+x.toFixed(1)+" "+y.toFixed(1); run=true; curRun=[[x,y]]; curBlk=b; curRun.isPath=true; }
+            else if(ok2){ dPath+="L"+x.toFixed(1)+" "+y.toFixed(1); curRun.push([x,y]); }
+            else { if(curRun&&curRun.length>5) addLong(curBlk,curRun); curRun=null; run=false; }
+          }
+          if(curRun&&curRun.length>5) addLong(curBlk,curRun);
+        }
+      }
+    }
+    /* GELB: Bloecke ohne orange Flucht bekommen die Mittellinie zwischen den
+       Haeuserreihen (Backbone: laeuft von Strasse zu Strasse, meidet Gebaeude) */
+    let dYel="";
+    for(const [id,hs] of byBlk){
+      if(!qualM[id]||orangeBlocks.has(id)) continue;
+      const bl=lineByBlk.get(id);
+      if(!bl) continue;
+      // von der MITTE nach aussen nur bis zum ersten Strassen-Kontakt zeichnen –
+      // die Backbone-Enden schnoerkeln sonst um Haeuser herum zur Blockspitze
+      const pts=bl.pts;
+      const nearRoad=k=>{
+        const gx=(pts[k][0]/cell)|0, gy=(pts[k][1]/cell)|0;
+        if(gx<0||gy<0||gx>=GW||gy>=GH) return true;
+        const i=gy*GW+gx;
+        return dR[i]>=0&&dR[i]*cell<=4;
+      };
+      const mid=(pts.length/2)|0;
+      let a=0,b=pts.length-1;
+      for(let k=mid;k>=0;k--) if(nearRoad(k)){ a=k; break; }
+      for(let k=mid;k<pts.length;k++) if(nearRoad(k)){ b=k; break; }
+      if(b-a<10){ a=0; b=pts.length-1; }        // degeneriert -> ganze Linie
+      const lp=[];
+      for(let k=a;k<=b;k+=3) lp.push(pts[k]);
+      addLong(id,lp);
+      boundaryRuns.push({g:++gid,pts:lp});      // gelbe Mittellinie = echte Grenze
+    }
+    /* ===== QUERGRENZEN (blau, User-Verfahren) =====
+       Haus braucht: sichere Strassenseite (naechste Strasse <=35 m) + Langlinie
+       (orange/gelb/Fussweg) auf der RUECKSEITE (<=250 m). Nachbarpaare entlang der
+       Linie: eine gemeinsame Grenze mittig - oder an der Kante eines Kleingebaeudes
+       dazwischen - oder beidseits eines Fusswegs dazwischen. */
+    const blueHouses=new Set();
+    let dBlue="";
+    window.crossLines=[];
+    {
+      const smalls=[];
+      for(const p of blds){
+        if(!p||p.length<3) continue;
+        let a2=0,scx=0,scy=0;
+        for(let i=0,j=p.length-1;i<p.length;j=i++){
+          const cr=p[j][0]*p[i][1]-p[i][0]*p[j][1];
+          a2+=cr; scx+=(p[j][0]+p[i][0])*cr; scy+=(p[j][1]+p[i][1])*cr;
+        }
+        if(a2===0) continue;
+        const A=Math.abs(a2/2);
+        if(A<6||A>=55) continue;
+        smalls.push({p,cx:scx/(3*a2),cy:scy/(3*a2)});
+      }
+      const frontOf=(x,y)=>{
+        let bd=1e18,fx2=0,fy2=0;
+        for(let a2=0;a2<16;a2++){
+          const ang=a2/16*2*Math.PI, dx2=Math.cos(ang), dy2=Math.sin(ang);
+          for(let t2=cell;t2<=35;t2+=cell){
+            const gx=((x+dx2*t2)/cell)|0, gy=((y+dy2*t2)/cell)|0;
+            if(gx<0||gy<0||gx>=GW||gy>=GH) break;
+            if(isBound(gy*GW+gx)){ if(t2<bd){ bd=t2; fx2=dx2; fy2=dy2; } break; }
+          }
+        }
+        return bd<=35?{d:bd,fx:fx2,fy:fy2}:null;
+      };
+      for(const [id,lines] of longByBlk){
+        if(!qualM[id]) continue;
+        const hs=byBlk.get(id)||[];
+        if(hs.length<2) continue;
+        const hl=hs.map(h=>{
+          let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18;
+          for(const q2 of h.p){ if(q2[0]<x0)x0=q2[0]; if(q2[0]>x1)x1=q2[0]; if(q2[1]<y0)y0=q2[1]; if(q2[1]>y1)y1=q2[1]; }
+          return {p:h.p,x0,y0,x1,y1};
+        });
+        const inH=(x,y)=>{
+          for(const e of hl){
+            if(x<e.x0||x>e.x1||y<e.y0||y>e.y1) continue;
+            let inside=false;
+            const p=e.p;
+            for(let i2=0,j2=p.length-1;i2<p.length;j2=i2++){
+              if((p[i2][1]>y)!==(p[j2][1]>y)&&x<p[i2][0]+(y-p[i2][1])/(p[j2][1]-p[i2][1])*(p[j2][0]-p[i2][0])) inside=!inside;
+            }
+            if(inside) return true;
+          }
+          return false;
+        };
+        // je Hauspaar nur EINE Grenze - auch wenn mehrere Langlinien es erfassen
+        const donePairs=new Set();
+        const pairKey=(h1,h2)=>{
+          const i1=hs.indexOf(h1), i2=hs.indexOf(h2);
+          return Math.min(i1,i2)+"_"+Math.max(i1,i2);
+        };
+        const axesOf=h=>{
+          let best=0, th=0;
+          for(let i3=0;i3<h.p.length-1;i3++){
+            const ddx=h.p[i3+1][0]-h.p[i3][0], ddy=h.p[i3+1][1]-h.p[i3][1], L4=ddx*ddx+ddy*ddy;
+            if(L4>best){ best=L4; th=Math.atan2(ddy,ddx); }
+          }
+          const c3=Math.cos(th), s3=Math.sin(th);
+          return [[c3,s3],[-s3,c3]];
+        };
+        /* Jedes Haus wird genau EINER Langlinie zugeordnet (der naechsten, die fuer
+           qualifizierte Haeuser HINTER dem Haus liegt) - vorher wurde jedes Haus von
+           jeder Linie im 250-m-Umkreis erfasst und jede baute eigene Grenzen (Chaos) */
+        const hInfo=new Map();
+        for(const h of hs){
+          const f=frontOf(h.cx,h.cy);
+          let best=null;
+          for(let li=0;li<lines.length;li++){
+            const line=lines[li];
+            let bd=1e18,bk=0;
+            for(let k=0;k<line.length;k++){
+              const d=(line[k][0]-h.cx)*(line[k][0]-h.cx)+(line[k][1]-h.cy)*(line[k][1]-h.cy);
+              if(d<bd){ bd=d; bk=k; }
+            }
+            bd=Math.sqrt(bd);
+            if(bd>250) continue;
+            let behind=false;
+            if(f){
+              const ldx=line[bk][0]-h.cx, ldy=line[bk][1]-h.cy;
+              behind=(ldx*f.fx+ldy*f.fy<=0);
+            }
+            // Linien HINTER dem Haus werden bevorzugt; sonst naechstgelegene
+            const score=bd+(f&&!behind?1000:0);
+            if(!best||score<best.score) best={score,li,k:bk,d:bd,behind};
+          }
+          if(!best) continue;
+          let q=false, ax=null;
+          if(f&&best.behind){
+            q=true;
+            const cand2=axesOf(h);
+            ax=Math.abs(cand2[0][0]*f.fx+cand2[0][1]*f.fy)>=Math.abs(cand2[1][0]*f.fx+cand2[1][1]*f.fy)?cand2[0]:cand2[1];
+            if(ax[0]*f.fx+ax[1]*f.fy<0) ax=[-ax[0],-ax[1]];
+          }
+          hInfo.set(h,{li:best.li,k:best.k,f,q,ax});
+        }
+        for(let li=0;li<lines.length;li++){
+          const line=lines[li];
+          const S=[0];
+          for(let k=1;k<line.length;k++) S.push(S[k-1]+Math.hypot(line[k][0]-line[k-1][0],line[k][1]-line[k-1][1]));
+          const near=(x,y)=>{
+            let bi=0,bd=1e18;
+            for(let k=0;k<line.length;k++){
+              const d=(line[k][0]-x)*(line[k][0]-x)+(line[k][1]-y)*(line[k][1]-y);
+              if(d<bd){ bd=d; bi=k; }
+            }
+            return {k:bi,d:Math.sqrt(bd)};
+          };
+          const tangAt=k=>{
+            const k1=Math.max(0,k-2), k2=Math.min(line.length-1,k+2);
+            let tx=line[k2][0]-line[k1][0], ty=line[k2][1]-line[k1][1];
+            const L3=Math.hypot(tx,ty)||1;
+            return [tx/L3,ty/L3];
+          };
+          // Reihen: nur Haeuser, die DIESER Linie zugeordnet sind
+          const rows=[[],[]];
+          for(const h of hs){
+            const inf=hInfo.get(h);
+            if(!inf||inf.li!==li) continue;
+            const [tx,ty]=tangAt(inf.k);
+            const cr=tx*(h.cy-line[inf.k][1])-ty*(h.cx-line[inf.k][0]);
+            rows[cr>=0?0:1].push({h,side:cr>=0?1:-1,q:inf.q,ax:inf.ax,f:inf.f});
+          }
+          for(const row of rows){
+            if(row.length<2) continue;
+            /* Reihenachse aus den HAUSZENTREN statt Linien-Bogenlaenge: bei weit
+               entfernter/gebogener Langlinie kollabieren die Projektionen sonst
+               (Nachbarn scheinbar <6 m auseinander -> Grenzen fielen aus) */
+            let mx3=0,my3=0;
+            for(const e of row){ mx3+=e.h.cx; my3+=e.h.cy; }
+            mx3/=row.length; my3/=row.length;
+            let sxx2=0,sxy2=0,syy2=0;
+            for(const e of row){ const ax2=e.h.cx-mx3, ay2=e.h.cy-my3; sxx2+=ax2*ax2; sxy2+=ax2*ay2; syy2+=ay2*ay2; }
+            const rang=0.5*Math.atan2(2*sxy2,sxx2-syy2);
+            const rx=Math.cos(rang), ry=Math.sin(rang);
+            const uOf=(x,y)=>(x-mx3)*rx+(y-my3)*ry;
+            const latOf=(x,y)=>-(x-mx3)*ry+(y-my3)*rx;
+            for(const e of row){
+              e.u=uOf(e.h.cx,e.h.cy);
+              e.lat=latOf(e.h.cx,e.h.cy);
+              let lo=1e18,hi=-1e18;
+              for(const q2 of e.h.p){ const t4=uOf(q2[0],q2[1]); if(t4<lo)lo=t4; if(t4>hi)hi=t4; }
+              e.uLo=lo; e.uHi=hi;
+            }
+            row.sort((a,b)=>a.u-b.u);
+            for(let i2=0;i2+1<row.length;i2++){
+              const A2=row[i2], B2=row[i2+1];
+              if(!A2.q&&!B2.q) continue;                     // mind. ein blaues Haus
+              const pk=pairKey(A2.h,B2.h);
+              if(donePairs.has(pk)) continue;
+              const gap=B2.u-A2.u;
+              if(gap<6||gap>60) continue;
+              if(Math.abs(A2.lat-B2.lat)>18) continue;       // seitlich versetzt: keine Reihe
+              if(A2.f&&B2.f&&(A2.f.fx*B2.f.fx+A2.f.fy*B2.f.fy)<0.5) continue;  // verschiedene Strassenfronten
+              donePairs.add(pk);
+              // Wand-zu-Wand-Mitte
+              const uMid=Math.max(A2.u+2,Math.min(B2.u-2,(A2.uHi+B2.uLo)/2));
+              const latM=(A2.lat+B2.lat)/2;
+              // Fussweg dazwischen? -> Grenze beidseits des Wegs
+              const inGapP=[];
+              if(grid.pth&&!line.isPath) for(const pp of grid.pth){
+                for(let s3=0;s3<pp.length-1;s3++){
+                  const L3=Math.hypot(pp[s3+1][0]-pp[s3][0],pp[s3+1][1]-pp[s3][1]);
+                  if(L3<0.5) continue;
+                  for(let t3=0;t3<=L3;t3+=3){
+                    const qx=pp[s3][0]+(pp[s3+1][0]-pp[s3][0])/L3*t3, qy=pp[s3][1]+(pp[s3+1][1]-pp[s3][1])/L3*t3;
+                    const uq=uOf(qx,qy);
+                    if(uq<=A2.uHi+1||uq>=B2.uLo-1) continue;
+                    if(Math.abs(latOf(qx,qy)-latM)>45) continue;
+                    inGapP.push(uq);
+                  }
+                }
+              }
+              const bounds=[];
+              if(inGapP.length>=2){
+                const uPath=inGapP.reduce((s2,o)=>s2+o,0)/inGapP.length;
+                bounds.push(uPath-2.5,uPath+2.5);
+              } else {
+                // Kleingebaeude dazwischen? -> Grenze an dessen Kante
+                let bestU=null,bestD=1e18;
+                for(const sb of smalls){
+                  const uq=uOf(sb.cx,sb.cy);
+                  if(uq<=A2.u||uq>=B2.u) continue;
+                  if(Math.abs(latOf(sb.cx,sb.cy)-latM)>45) continue;
+                  let lo=1e18,hi=-1e18;
+                  for(const q2 of sb.p){ const t4=uOf(q2[0],q2[1]); if(t4<lo)lo=t4; if(t4>hi)hi=t4; }
+                  for(const se of [lo,hi]){
+                    if(se<=A2.u+1||se>=B2.u-1) continue;
+                    const dd2=Math.abs(se-uMid);
+                    if(dd2<bestD){ bestD=dd2; bestU=se; }
+                  }
+                }
+                bounds.push(bestU!=null?bestU:uMid);
+              }
+              // Grenzrichtung: gemittelte Seitenwand-Richtung beider Haeuser
+              const ref=A2.q?A2:B2;
+              let bx2=0,by2=0;
+              for(const E2 of [A2,B2]){
+                let a3=E2.ax;
+                if(!a3){
+                  const cand2=axesOf(E2.h);
+                  a3=Math.abs(cand2[0][0]*ref.ax[0]+cand2[0][1]*ref.ax[1])>=Math.abs(cand2[1][0]*ref.ax[0]+cand2[1][1]*ref.ax[1])?cand2[0]:cand2[1];
+                }
+                if(a3[0]*ref.ax[0]+a3[1]*ref.ax[1]<0) a3=[-a3[0],-a3[1]];
+                bx2+=a3[0]; by2+=a3[1];
+              }
+              const bl2=Math.hypot(bx2,by2)||1;
+              let dirx=bx2/bl2, diry=by2/bl2;       // zeigt zur Strasse (Front)
+              // Plausibilitaet: Grenze muss grob zur Strasse zeigen (Front-Strahl des
+              // blauen Referenzhauses). Weicht die Wand-Erkennung >~35 Grad ab
+              // (L-Grundrisse, schiefe laengste Kante), gilt die Front-Richtung
+              if(ref.f){
+                if(dirx*ref.f.fx+diry*ref.f.fy<0.82){ dirx=ref.f.fx; diry=ref.f.fy; }
+              }
+              for(const ub of bounds){
+                const Mx=mx3+rx*ub-ry*latM, My=my3+ry*ub+rx*latM;
+                const g=++gid;                     // eine Quergrenze = eine Grenz-ID
+                // beidseitig: zur Strasse (bis isBound) und zur Langlinie (bis Linie erreicht)
+                for(const sgn of [1,-1]){
+                  let cur=null, started=false;
+                  for(let t5=0;t5<=250;t5+=cell){
+                    const x=Mx+dirx*t5*sgn, y=My+diry*t5*sgn;
+                    const gx=(x/cell)|0, gy=(y/cell)|0;
+                    if(gx<0||gy<0||gx>=GW||gy>=GH) break;
+                    const gi=gy*GW+gx;
+                    if(isBound(gi)) break;
+                    const f2=flags[gi];
+                    if(f2&32){ if(started) break; }  // Fussweg/Parkplatz stoppt die Grenze
+                    else started=true;
+                    if(blk[gi]!==id&&!(f2&1)) break;
+                    const okc=!(f2&1)&&!(f2&32)&&!inH(x,y);
+                    if(okc){ if(!cur) cur=[]; cur.push([x,y]); }
+                    else { if(cur&&cur.length>2) boundaryRuns.push({g,pts:cur}); cur=null; }
+                    if(sgn===-1&&near(x,y).d<2.5) break;   // Langlinie erreicht
+                  }
+                  if(cur&&cur.length>2) boundaryRuns.push({g,pts:cur});
+                }
+                if(A2.q) blueHouses.add(A2.h);
+                if(B2.q) blueHouses.add(B2.h);
+                window.crossLines.push({blk:id,u:ub});
+              }
+            }
+          }
+        }
+      }
+    }
+    /* ===== BEBAUUNG: 80 % der Grenzen komplett mit Zaun/Hecke/Mauer, Rest offen.
+       Zaun = kletterbar+durchsichtig (Bit 2), Hecke/Mauer = zusaetzlich sichtblockierend
+       (Bit 2|4). Wege/Wasser/Gebaeude-Zellen werden nie ueberschrieben. ===== */
+    {
+      const byG=new Map();
+      for(const r of boundaryRuns){
+        let a=byG.get(r.g); if(!a){a=[];byG.set(r.g,a);}
+        a.push(r.pts);
+      }
+      const dP={z:"",h:"",m:""};
+      const cellRect=(i,grow)=>{
+        const x=(i%GW)*cell-grow, y=((i/GW)|0)*cell-grow, s=cell+2*grow;
+        return "M"+x.toFixed(1)+" "+y.toFixed(1)+"h"+s.toFixed(1)+"v"+s.toFixed(1)+"h-"+s.toFixed(1)+"z";
+      };
+      const stamped=new Set();
+      for(const runs of byG.values()){
+        // 100 % bebauen - die nicht erkannten Grenzen sind Luecken genug (Userentscheid)
+        const r2=Math.random();
+        const typ=r2<0.5?"z":(r2<0.9?"h":"m");
+        for(const pts of runs){
+          for(let k=0;k+1<pts.length;k++){
+            const L2=Math.hypot(pts[k+1][0]-pts[k][0],pts[k+1][1]-pts[k][1]);
+            const st=Math.max(1,Math.ceil(L2/cell));
+            for(let s3=0;s3<=st;s3++){
+              const x=pts[k][0]+(pts[k+1][0]-pts[k][0])*s3/st, y=pts[k][1]+(pts[k+1][1]-pts[k][1])*s3/st;
+              const gx=(x/cell)|0, gy=(y/cell)|0;
+              if(gx<0||gy<0||gx>=GW||gy>=GH) continue;
+              const i=gy*GW+gx;
+              if(stamped.has(i)) continue;
+              if(flags[i]&(1|8|32)) continue;
+              stamped.add(i);
+              flags[i]|=2;
+              if(typ!=="z") flags[i]|=4;
+              grid.btype[i]=typ==="z"?1:(typ==="h"?2:3);
+              dP[typ]+=cellRect(i,typ==="h"?cell*0.5:0);
+            }
+          }
+        }
+      }
+      const styles={z:["#8f8f88",.9],h:["#79a163",.85],m:["#5d5d57",.95]};
+      for(const t of ["h","z","m"]){
+        if(!dP[t]) continue;
+        const el=document.createElementNS(NS,"path");
+        el.setAttribute("d",dP[t]);
+        el.setAttribute("fill",styles[t][0]);
+        el.setAttribute("opacity",String(styles[t][1]));
+        L.fence.appendChild(el);
+      }
+    }
+    // Fusswege durch Wohnbloecke: sichtbarer normaler Weg (kein Hindernis)
+    if(dPath){
+      const el=document.createElementNS(NS,"path");
+      el.setAttribute("d",dPath); el.setAttribute("fill","none");
+      el.setAttribute("stroke","#9a8265"); el.setAttribute("stroke-width","1.2");
+      el.setAttribute("stroke-dasharray","2.6 2.2"); el.setAttribute("opacity",".85");
+      L.fence.appendChild(el);
+    }
+    window.blockHints=[];
+    return;
+  }
+  /* Schritt 4 (lila Hinweise): Seitenwaende kleiner Nebengebaeude (Garagen/Schuppen
+     stehen meist AUF der Grundstuecksgrenze). Je Kleingebaeude die beiden Kanten,
+     die in Grenzrichtung (zur gruenen Linie hin) verlaufen, leicht verlaengert.
+     Fusswege sind bereits harte Blockgrenzen und brauchen keine Extra-Hinweise. */
+  const lineByBlk=new Map(window.blockLines.map(o=>[o.blk,o]));
+  window.blockHints=[];
+  for(const p of blds){
+    if(!p||p.length<3) continue;
+    let a2=0,cx=0,cy=0;
+    for(let i=0,j=p.length-1;i<p.length;j=i++){
+      const cr=p[j][0]*p[i][1]-p[i][0]*p[j][1];
+      a2+=cr; cx+=(p[j][0]+p[i][0])*cr; cy+=(p[j][1]+p[i][1])*cr;
+    }
+    if(a2===0) continue;
+    const A=Math.abs(a2/2);
+    if(A<6||A>=55) continue;                    // nur Nebengebaeude
+    cx/=3*a2; cy/=3*a2;
+    const ci=Math.min(GH-1,Math.max(0,(cy/cell)|0))*GW+Math.min(GW-1,Math.max(0,(cx/cell)|0));
+    const bl=lineByBlk.get(blk[ci]);
+    if(!bl) continue;
+    // Grenzrichtung: vom Gebaeude zur naechsten Stelle der gruenen Linie
+    let bx=0,by=0,bd2=1e18;
+    for(let k=0;k<bl.pts.length;k+=4){
+      const dx=bl.pts[k][0]-cx, dy=bl.pts[k][1]-cy, d2=dx*dx+dy*dy;
+      if(d2<bd2){ bd2=d2; bx=bl.pts[k][0]; by=bl.pts[k][1]; }
+    }
+    const dl=Math.hypot(bx-cx,by-cy);
+    if(dl<1) continue;
+    const dirx=(bx-cx)/dl, diry=(by-cy)/dl;
+    // OBB des Kleingebaeudes
+    let best=0, th=0;
+    for(let i=0;i<p.length-1;i++){
+      const dx=p[i+1][0]-p[i][0], dy=p[i+1][1]-p[i][1], L2=dx*dx+dy*dy;
+      if(L2>best){ best=L2; th=Math.atan2(dy,dx); }
+    }
+    const c=Math.cos(th), s=Math.sin(th);
+    let u0=1e9,u1=-1e9,v0=1e9,v1=-1e9;
+    for(const q2 of p){
+      const u=q2[0]*c+q2[1]*s, v=-q2[0]*s+q2[1]*c;
+      if(u<u0)u0=u; if(u>u1)u1=u; if(v<v0)v0=v; if(v>v1)v1=v;
+    }
+    const uc=(u0+u1)/2, vc=(v0+v1)/2, ha=(u1-u0)/2, hb=(v1-v0)/2;
+    const wx=uc*c-vc*s, wy=uc*s+vc*c;
+    const du=[c,s], dv=[-s,c];
+    const alignU=Math.abs(du[0]*dirx+du[1]*diry), alignV=Math.abs(dv[0]*dirx+dv[1]*diry);
+    if(Math.max(alignU,alignV)<0.7) continue;   // steht schief zur Grenzrichtung
+    const e=alignU>=alignV?du:dv;               // Kantenrichtung laengs der Grenze
+    const perp=alignU>=alignV?dv:du;
+    const half=(alignU>=alignV?ha:hb)+3;        // 3 m verlaengert
+    const off=alignU>=alignV?hb:ha;
+    for(const sgn of [1,-1]){
+      const mx=wx+perp[0]*off*sgn, my=wy+perp[1]*off*sgn;
+      const h={x1:mx-e[0]*half, y1:my-e[1]*half, x2:mx+e[0]*half, y2:my+e[1]*half, blk:blk[ci]};
+      window.blockHints.push(h);
+      const l=document.createElementNS(NS,"line");
+      l.setAttribute("x1",h.x1.toFixed(1)); l.setAttribute("y1",h.y1.toFixed(1));
+      l.setAttribute("x2",h.x2.toFixed(1)); l.setAttribute("y2",h.y2.toFixed(1));
+      l.setAttribute("stroke","#5b2d9e"); l.setAttribute("stroke-width","1.2");
+      l.setAttribute("opacity",".9");
+      L.fence.appendChild(l);
+    }
+  }
+}
+/* ===== Parzellen-Generator: Zaeune/Hecken/Mauern zwischen Einzelhaeusern =====
+   Wohngebiets-Heuristik: freistehende Haeuser (35-400 m², Nachbarhaus < 60 m) werden
+   Saatpunkte einer Voronoi-Flutung auf dem Raster (Strassen/Wasser begrenzen, Garagen &
+   Schuppen sind Hindernisse -> Grenzen folgen deren Waenden). Grenzzellen werden zu
+   ~80 % bebaut: Zaun (kletterbar, durchsichtig), Hecke/Mauer (kletterbar, sichtblockierend).
+   Jede Strassenfront bekommt ein Gartentor; ~40 % der Vorgaerten bleiben offen. */
+function generateParcels(blds){
+  const PARCELS=false;   // Parzellen-Grenzen komplett deaktiviert (User skizziert Neugestaltung)
+  if(!PARCELS||!grid) return;
+  const {flags,GW,GH,cell}=grid;
+  const N=GW*GH;
+  L.fence.innerHTML="";
+  const houses=[];
+  for(const p of blds){
+    if(!p||p.length<3) continue;
+    let a2=0,cx=0,cy=0;
+    for(let i=0,j=p.length-1;i<p.length;j=i++){
+      const cr=p[j][0]*p[i][1]-p[i][0]*p[j][1];
+      a2+=cr; cx+=(p[j][0]+p[i][0])*cr; cy+=(p[j][1]+p[i][1])*cr;
+    }
+    if(a2===0) continue;
+    const A=Math.abs(a2/2);
+    if(A<35||A>400) continue;
+    houses.push({p,cx:cx/(3*a2),cy:cy/(3*a2)});
+  }
+  const use=houses.filter(h=>houses.some(o=>o!==h&&Math.hypot(o.cx-h.cx,o.cy-h.cy)<60));
+  if(use.length<3) return;
+  // Orientierte Bounding-Box je Haus (Ausrichtung = laengste Kante, mod 90°);
+  // Zuteilung per Rechteck-Abstand IM HAUS-KOORDINATENSYSTEM: die Iso-Linien sind
+  // Rechtecke parallel zu den Hauswaenden -> gerade, kantenparallele Grenzen
+  const items=use.map(h=>{
+    const p=h.p;
+    let bl=0, th=0;
+    for(let i=0;i<p.length-1;i++){
+      const dx=p[i+1][0]-p[i][0], dy=p[i+1][1]-p[i][1];
+      const L2=dx*dx+dy*dy;
+      if(L2>bl){ bl=L2; th=Math.atan2(dy,dx); }
+    }
+    th=((th%(Math.PI/2))+Math.PI/2)%(Math.PI/2);
+    const c=Math.cos(th), s=Math.sin(th);
+    let u0=1e9,u1=-1e9,v0=1e9,v1=-1e9;
+    for(const q2 of p){
+      const u=q2[0]*c+q2[1]*s, v=-q2[0]*s+q2[1]*c;
+      if(u<u0)u0=u; if(u>u1)u1=u; if(v<v0)v0=v; if(v>v1)v1=v;
+    }
+    const uc=(u0+u1)/2, vc=(v0+v1)/2;
+    return {c,s,uc,vc,a:(u1-u0)/2,b:(v1-v0)/2,wx:uc*c-vc*s,wy:uc*s+vc*c};
+  });
+  const label=new Int32Array(N).fill(-1);
+  const distV=new Float32Array(N).fill(1e9);
+  const ok=i=>!(flags[i]&(1|8|32));
+  const DMAX=24;   // maximale Gartentiefe (senkrecht zur Hausfront) in Metern
+  const LMAX=12;   // maximale seitliche Ausdehnung neben dem Haus in Metern
+  // Zuteilung LEXIKOGRAFISCH: erst seitlicher Abstand (laengs der Haeuserzeile),
+  // bei Gleichstand die Tiefe. Parzellen werden dadurch Streifen senkrecht zur
+  // Strasse - keine 45-Grad-Naehte ab den Hausecken mehr (Chebyshev-Artefakt).
+  items.forEach((it,id)=>{
+    const R=Math.max(it.a+LMAX,it.b+DMAX);
+    const x0=Math.max(0,((it.wx-R)/cell)|0), x1=Math.min(GW-1,((it.wx+R)/cell)|0);
+    const y0=Math.max(0,((it.wy-R)/cell)|0), y1=Math.min(GH-1,((it.wy+R)/cell)|0);
+    for(let y=y0;y<=y1;y++){
+      const wy=(y+0.5)*cell, row=y*GW;
+      for(let x=x0;x<=x1;x++){
+        const i=row+x;
+        if(!ok(i)) continue;
+        const wx=(x+0.5)*cell;
+        const u=wx*it.c+wy*it.s, v=-wx*it.s+wy*it.c;
+        const dl=Math.max(Math.abs(u-it.uc)-it.a, 0);
+        const dd=Math.max(Math.abs(v-it.vc)-it.b, 0);
+        if(dl>LMAX||dd>DMAX) continue;
+        const key=dl*100+dd;
+        if(key>=distV[i]) continue;
+        distV[i]=key; label[i]=id;
+      }
+    }
+  });
+  // Zusammenhangs-Prune: jede Parzellenzelle muss vom eigenen Haus aus erreichbar sein
+  // (entfernt Zuteilungen, die "ueber die Strasse" oder hinter fremde Gebaeude gerutscht sind)
+  const reach=new Uint8Array(N);
+  const q=new Int32Array(N);
+  let qt=0;
+  for(let i=0;i<N;i++) if(label[i]>=0&&distV[i]<3){ reach[i]=1; q[qt++]=i; }
+  let qh=0;
+  while(qh<qt){
+    const i=q[qh++], id=label[i], cx=i%GW, cy=(i/GW)|0;
+    if(cx>0){const nn=i-1; if(!reach[nn]&&label[nn]===id){reach[nn]=1;q[qt++]=nn;}}
+    if(cx<GW-1){const nn=i+1; if(!reach[nn]&&label[nn]===id){reach[nn]=1;q[qt++]=nn;}}
+    if(cy>0){const nn=i-GW; if(!reach[nn]&&label[nn]===id){reach[nn]=1;q[qt++]=nn;}}
+    if(cy<GH-1){const nn=i+GW; if(!reach[nn]&&label[nn]===id){reach[nn]=1;q[qt++]=nn;}}
+  }
+  for(let i=0;i<N;i++) if(label[i]>=0&&!reach[i]) label[i]=-1;
+  // Grenzzellen: zwischen zwei Parzellen, zur Strassenfront, am Flutungsrand (Rueckgrenze)
+  const segs=new Map();
+  const add=(key,i)=>{ let a=segs.get(key); if(!a){a=[];segs.set(key,a);} a.push(i); };
+  const backMin=5;   // Meter: erst ab dieser Gartentiefe eine Rueckgrenze setzen
+  for(let y=0;y<GH;y++){
+    const row=y*GW;
+    for(let x=0;x<GW;x++){
+      const i=row+x, id=label[i];
+      if(id<0) continue;
+      let front=false, back=false;
+      const nb=[x>0?i-1:-1,x<GW-1?i+1:-1,y>0?i-GW:-1,y<GH-1?i+GW:-1];
+      for(const nn of nb){
+        if(nn<0) continue;
+        const l2=label[nn];
+        if(l2>=0){ if(l2!==id&&id<l2) add(id+"|"+l2,i); }
+        else if(flags[nn]&32) front=true;
+        else if(ok(nn)) back=true;
+      }
+      if(front) add("f"+id,i);
+      else if(back&&distV[i]>backMin) add("b"+id,i);
+    }
+  }
+  const dPaths={z:"",h:"",m:""};
+  const cellRect=(i,grow)=>{
+    const x=(i%GW)*cell-grow, y=((i/GW)|0)*cell-grow, s=cell+2*grow;
+    return "M"+x.toFixed(1)+" "+y.toFixed(1)+"h"+s.toFixed(1)+"v"+s.toFixed(1)+"h-"+s.toFixed(1)+"z";
+  };
+  for(const cells of segs.values()){
+    if(Math.random()>0.8) continue;                 // 20 % aller Grenzen bleiben komplett offen
+    const r=Math.random();
+    const HEDGES=false;   // Hecken vorerst deaktiviert (User skizziert Neugestaltung)
+    const typ=r<0.5?"z":(r<0.9?(HEDGES?"h":"z"):"m");
+    for(const i of cells){                          // bebaute Grenzen durchgehend (nur Fusswege bleiben frei)
+      if(flags[i]&(1|8|32)) continue;
+      flags[i]|=2;
+      if(typ!=="z") flags[i]|=4;                    // Hecke/Mauer blockieren Sicht
+      dPaths[typ]+=cellRect(i,typ==="h"?cell*0.5:0);
+    }
+  }
+  const styles={z:["#8f8f88",.9],h:["#79a163",.85],m:["#5d5d57",.95]};
+  for(const t of ["h","z","m"]){
+    if(!dPaths[t]) continue;
+    const el=document.createElementNS(NS,"path");
+    el.setAttribute("d",dPaths[t]);
+    el.setAttribute("fill",styles[t][0]);
+    el.setAttribute("opacity",String(styles[t][1]));
+    L.fence.appendChild(el);
+  }
+}
+function compAt(x,y){
+  if(!grid||!grid.comp) return -1;
+  const {GW,GH,cell}=grid;
+  const cx=Math.min(GW-1,Math.max(0,Math.floor(x/cell))), cy=Math.min(GH-1,Math.max(0,Math.floor(y/cell)));
+  return grid.comp[cy*GW+cx];
+}
+function drawCompOverlay(){
+  const {GW,GH,cell,comp,flags,playable}=grid;
+  const cv=document.createElement("canvas");
+  cv.width=GW; cv.height=GH;
+  const ctx=cv.getContext("2d");
+  const img=ctx.createImageData(GW,GH);
+  const TINTS=[[60,120,200],[60,160,80],[210,150,50],[150,80,190],[0,150,160],[200,80,140]];
+  const pIdx=new Map(playable.map((id,i)=>[id,i]));
+  for(let i=0;i<GW*GH;i++){
+    if(flags[i]&1) continue;
+    const o=i*4;
+    const pi=pIdx.get(comp[i]);
+    if(pi!==undefined){
+      const t=TINTS[pi%TINTS.length];
+      img.data[o]=t[0]; img.data[o+1]=t[1]; img.data[o+2]=t[2]; img.data[o+3]=42;
+    } else {
+      img.data[o]=175; img.data[o+1]=55; img.data[o+2]=45; img.data[o+3]=80;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  L.comp.innerHTML="";
+  const im=document.createElementNS(NS,"image");
+  im.setAttribute("href",cv.toDataURL());
+  im.setAttribute("x",0); im.setAttribute("y",0);
+  im.setAttribute("width",GW*cell); im.setAttribute("height",GH*cell);
+  im.setAttribute("preserveAspectRatio","none");
+  im.setAttribute("pointer-events","none");
+  L.comp.appendChild(im);
+}
+/* ===== Wissens-Ebenen: unerkundet (dunkel) / erkundet / beobachtet & gesichert (Spielerfarbe) ===== */
+function hex2rgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+let lastKnow=0, lastKsig="", visScratch=null, contScratch=null, knowStack=null, knowImg=null, knowCv=null, visHScratch=null, visBScratch=null;
+let fpG=null, fpCame=null, fpVer=null, fpClosedV=null, fpVerN=0;
+/* Wissens-System rechnet auf einem Halb-Raster (1/4 der Zellen) – bei 2000er-Grids
+   sonst zu teuer fuer fluessiges Spiel mit vielen Einheiten */
+function ensureHalfGrid(){
+  if(grid.KW) return;
+  const {flags,GW,GH,comp}=grid;
+  const KW=Math.ceil(GW/2), KH=Math.ceil(GH/2);
+  const hFlags=new Uint8Array(KW*KH);
+  const hComp=new Int32Array(KW*KH).fill(-1);
+  for(let y=0;y<KH;y++){
+    for(let x=0;x<KW;x++){
+      let f=0, c=-1;
+      for(let dy=0;dy<2;dy++){
+        const yy=y*2+dy; if(yy>=GH) continue;
+        const row=yy*GW;
+        for(let dx=0;dx<2;dx++){
+          const xx=x*2+dx; if(xx>=GW) continue;
+          const ff=flags[row+xx];
+          f|=ff&(1|4|16);
+          if(!(ff&1)&&c<0) c=comp[row+xx];
+        }
+      }
+      hFlags[y*KW+x]=f; hComp[y*KW+x]=c;
+    }
+  }
+  grid.KW=KW; grid.KH=KH; grid.hFlags=hFlags; grid.hComp=hComp;
+}
+function knowledgeFor(color){
+  ensureHalfGrid();
+  if(!grid.know) grid.know={};
+  if(!grid.know[color]) grid.know[color]={explored:new Uint8Array(grid.KW*grid.KH), safe:new Uint8Array(grid.KW*grid.KH)};
+  return grid.know[color];
+}
+function ensureKnowImg(){
+  if(knowImg&&knowImg.parentNode) return knowImg;
+  knowImg=document.createElementNS(NS,"image");
+  knowImg.setAttribute("x",0); knowImg.setAttribute("y",0);
+  knowImg.setAttribute("width",grid.GW*grid.cell); knowImg.setAttribute("height",grid.GH*grid.cell);
+  knowImg.setAttribute("preserveAspectRatio","none");
+  knowImg.setAttribute("pointer-events","none");
+  knowImg.setAttribute("filter","url(#fogblur)");
+  L.know.appendChild(knowImg);
+  return knowImg;
+}
+function updateKnowledge(force){
+  if(!grid||!area) return;
+  const now=performance.now();
+  const kimg=ensureKnowImg();
+  const active=markers.filter(m=>m.color===placeColor&&!m.dummy&&!m.dead);
+  if(!active.length){ kimg.style.display="none"; return; }
+  // Intervall waechst mit der Truppengroesse (Rechenlast pro Lauf steigt mit)
+  const iv=450+60*Math.max(0,active.length-4);
+  if(!force&&now-lastKnow<iv) return;
+  // Steht alles still (und lebt dieselbe Gegnerzahl), aendert sich das Wissen nicht – Lauf sparen
+  const ksig=placeColor+"|"+active.map(m=>((m.x/grid.cell)|0)+","+((m.y/grid.cell)|0)+","
+    +(m.focus?(m.focus.type+((((m.focus.ang||0))*32)|0)+","+((m.focus.x||0)|0)+"_"+((m.focus.y||0)|0)):"")
+    +(m.walk&&m.walkDir!=null?"w"+((m.walkDir*32)|0):"")+(m.carry||"")).join(";")
+    +"#"+markers.filter(m=>m.dummy&&!m.dead).length;
+  if(!force&&ksig===lastKsig){ lastKnow=now; return; }
+  lastKsig=ksig; lastKnow=now;
+  kimg.style.display="";
+  const K=knowledgeFor(placeColor);
+  const {KW,KH,hFlags,hComp,cell}=grid;
+  const cell2=cell*2, N2=KW*KH;
+  if(!visScratch||visScratch.length!==N2){ visScratch=new Uint8Array(N2); contScratch=new Uint8Array(N2); knowStack=new Int32Array(N2); visHScratch=new Uint8Array(N2); visBScratch=new Uint8Array(N2); }
+  const vis=visScratch; vis.fill(0);
+  // Dichte Strahlen fuer die Zellen-Sichtmaske (Luecken = konservativ unsichtbar);
+  // Gesamtbudget ~2400 Strahlen, damit grosse Trupps nicht linear teurer werden
+  for(const m of active){
+    const h=headingOf(m);
+    const inF=flagsAt(m.x,m.y)&16;
+    const NR=Math.min(Math.max(128,Math.ceil(2*Math.PI*140/cell2)),Math.max(160,Math.floor(2400/active.length)));
+    for(let r=0;r<NR;r++){
+      const a=r/NR*2*Math.PI;
+      const R=h===null?radiusFor(m,0):radiusFor(m,angDiff(a,h));
+      const dx=Math.cos(a), dy=Math.sin(a);
+      let used=0, t=0;
+      for(;;){
+        t+=cell2;
+        if(t>=R) break;
+        const cx=Math.floor((m.x+dx*t)/cell2), cy=Math.floor((m.y+dy*t)/cell2);
+        if(cx<0||cy<0||cx>=KW||cy>=KH) break;
+        const i=cy*KW+cx;
+        vis[i]=1;
+        const f=hFlags[i];
+        if(f&4) break;
+        used+=cell2*((f&16)?(inF?2.5:5):1);
+        if(used>=R) break;
+      }
+    }
+    vis[Math.min(KH-1,Math.max(0,Math.floor(m.y/cell2)))*KW+Math.min(KW-1,Math.max(0,Math.floor(m.x/cell2)))]=1;
+  }
+  for(let i=0;i<N2;i++) if(vis[i]) K.explored[i]=1;
+  // Nur Komponenten, in denen Gegner existieren koennen, erzeugen Unsicherheit:
+  // im Gefecht die Komponenten der Dummys, sonst die der eigenen Einheiten
+  const eComps=new Set();
+  for(const m of markers){ if(m.dummy&&!m.dead) eComps.add(compAt(m.x,m.y)); }
+  if(!eComps.size) for(const m of active) eComps.add(compAt(m.x,m.y));
+  // Set.has pro Zelle ist bei Millionen Zellen teuer – als Array-Lookup umsetzen
+  const eMask=new Uint8Array(grid.compSizes.length);
+  for(const id of eComps) eMask[id]=1;
+  // Toleranz: Sichtmaske fuer die Kontaminations-Pruefung um 2 Zellen (~5-6 m) verbreitern –
+  // winzige Luecken in der Sichtkette gelten als abgeriegelt.
+  // Dilation nur im Umkreis der Einheiten (ausserhalb ist vis ohnehin 0)
+  const visH=visHScratch, visB=visBScratch;
+  visB.fill(0);
+  let bx0=KW-1, by0=KH-1, bx1=0, by1=0;
+  const BR=Math.ceil(180/cell2)+4;
+  for(const m of active){
+    const cx=(m.x/cell2)|0, cy=(m.y/cell2)|0;
+    bx0=Math.min(bx0,cx-BR); bx1=Math.max(bx1,cx+BR);
+    by0=Math.min(by0,cy-BR); by1=Math.max(by1,cy+BR);
+  }
+  bx0=Math.max(0,bx0); by0=Math.max(0,by0); bx1=Math.min(KW-1,bx1); by1=Math.min(KH-1,by1);
+  for(let y=by0;y<=by1;y++){
+    const row=y*KW;
+    for(let x=bx0;x<=bx1;x++){
+      const a=Math.max(bx0,x-2), b=Math.min(bx1,x+2);
+      let v=0;
+      for(let x2=a;x2<=b;x2++) if(vis[row+x2]){ v=1; break; }
+      visH[row+x]=v;
+    }
+  }
+  for(let x=bx0;x<=bx1;x++){
+    for(let y=by0;y<=by1;y++){
+      const a=Math.max(by0,y-2), b=Math.min(by1,y+2);
+      let v=0;
+      for(let y2=a;y2<=b;y2++) if(visH[y2*KW+x]){ v=1; break; }
+      visB[y*KW+x]=v;
+    }
+  }
+  // Kontamination: Unsicherheit flutet durch unbeobachtete begehbare Zellen dieser Komponenten
+  const cont=contScratch; cont.fill(0);
+  let sp=0;
+  for(let i=0;i<N2;i++){
+    if(hFlags[i]&1) continue;
+    const cc=hComp[i];
+    if(cc<0||!eMask[cc]) continue;
+    if(!K.safe[i]&&!visB[i]){ cont[i]=1; knowStack[sp++]=i; }
+  }
+  while(sp>0){
+    const c=knowStack[--sp];
+    const cx=c%KW, cy=(c/KW)|0;
+    if(cx>0){ const nn=c-1; if(!(hFlags[nn]&1)&&!visB[nn]&&!cont[nn]){ cont[nn]=1; knowStack[sp++]=nn; } }
+    if(cx<KW-1){ const nn=c+1; if(!(hFlags[nn]&1)&&!visB[nn]&&!cont[nn]){ cont[nn]=1; knowStack[sp++]=nn; } }
+    if(cy>0){ const nn=c-KW; if(!(hFlags[nn]&1)&&!visB[nn]&&!cont[nn]){ cont[nn]=1; knowStack[sp++]=nn; } }
+    if(cy<KH-1){ const nn=c+KW; if(!(hFlags[nn]&1)&&!visB[nn]&&!cont[nn]){ cont[nn]=1; knowStack[sp++]=nn; } }
+  }
+  for(let i=0;i<N2;i++){
+    if(hFlags[i]&1){ K.safe[i]=0; continue; }
+    const cc=hComp[i];
+    if(cc<0||!eMask[cc]){ K.safe[i]=1; continue; }   // dort kann kein Gegner sein
+    K.safe[i]=vis[i]?1:((K.safe[i]&&!cont[i])?1:0);
+  }
+  // Kleine eingeschlossene unsichere Taschen (<= ~75 m²) dauerhaft schlucken
+  {
+    const POCKET=15;   // Halb-Raster-Zellen (~cell2² m² je Zelle)
+    const seen=visH; seen.fill(0);
+    for(let i=0;i<N2;i++){
+      if(seen[i]||(hFlags[i]&1)||K.safe[i]) continue;
+      const cc=hComp[i];
+      if(cc<0||!eMask[cc]) continue;
+      let sp2=0, cnt=0;
+      const members=[];
+      knowStack[sp2++]=i; seen[i]=1;
+      while(sp2>0){
+        const c=knowStack[--sp2];
+        cnt++;
+        if(cnt<=POCKET+1) members.push(c);
+        const cx=c%KW, cy=(c/KW)|0;
+        if(cx>0){ const nn=c-1; if(!(hFlags[nn]&1)&&!K.safe[nn]&&!seen[nn]){ seen[nn]=1; knowStack[sp2++]=nn; } }
+        if(cx<KW-1){ const nn=c+1; if(!(hFlags[nn]&1)&&!K.safe[nn]&&!seen[nn]){ seen[nn]=1; knowStack[sp2++]=nn; } }
+        if(cy>0){ const nn=c-KW; if(!(hFlags[nn]&1)&&!K.safe[nn]&&!seen[nn]){ seen[nn]=1; knowStack[sp2++]=nn; } }
+        if(cy<KH-1){ const nn=c+KW; if(!(hFlags[nn]&1)&&!K.safe[nn]&&!seen[nn]){ seen[nn]=1; knowStack[sp2++]=nn; } }
+      }
+      if(cnt<=POCKET) for(const c of members){ K.safe[c]=1; K.explored[c]=1; }
+    }
+  }
+  // Canvas (Viertel-Aufloesung des vollen Grids): unerkundet dunkel, gesichert/beobachtet in Spielerfarbe
+  const W2=Math.ceil(KW/2), H2=Math.ceil(KH/2);
+  if(!knowCv) knowCv=document.createElement("canvas");
+  knowCv.width=W2; knowCv.height=H2;
+  const ctx=knowCv.getContext("2d");
+  const img=ctx.createImageData(W2,H2);
+  const [pr,pg,pb]=hex2rgb(placeColor);
+  for(let y=0;y<H2;y++) for(let x=0;x<W2;x++){
+    const i=Math.min(KH-1,y*2)*KW+Math.min(KW-1,x*2);
+    const o=(y*W2+x)*4;
+    if(!K.explored[i]){ img.data[o]=26; img.data[o+1]=30; img.data[o+2]=22; img.data[o+3]=150; }
+    else if(vis[i]){ img.data[o]=pr; img.data[o+1]=pg; img.data[o+2]=pb; img.data[o+3]=22; }
+    else if(K.safe[i]){ img.data[o]=pr; img.data[o+1]=pg; img.data[o+2]=pb; img.data[o+3]=44; }
+  }
+  ctx.putImageData(img,0,0);
+  kimg.setAttribute("href",knowCv.toDataURL());
+}
+function flagsAt(x,y){
+  if(!grid) return 0;
+  const {flags,GW,GH,cell}=grid;
+  const cx=Math.min(GW-1,Math.max(0,Math.floor(x/cell))), cy=Math.min(GH-1,Math.max(0,Math.floor(y/cell)));
+  return flags[cy*GW+cx];
+}
+function speedFactor(f){
+  if(f&32) return 1.4;     // Strasse/Weg zuerst: Bruecken & Uferwege ueber/nahe Wasser bleiben begehbar
+  if(f&8) return 0.2;      // Wasser: extrem eingeschraenkt
+  if(f&16) return 0.75;    // Wald: langsamer
+  if(f&128) return 0.85;   // Wiese/Gruenflaeche: langsamer als befestigter Boden
+  return 1;
+}
+function findPath(x0m,y0m,x1m,y1m){
+  const {flags,GW,GH,cell}=grid;
+  const cellOf=(x,y)=>[Math.min(GW-1,Math.max(0,Math.floor(x/cell))),Math.min(GH-1,Math.max(0,Math.floor(y/cell)))];
+  const freeNear=(cx,cy)=>{
+    if(!(flags[cy*GW+cx]&1)) return [cx,cy];
+    for(let r=1;r<80;r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+      if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue;
+      const nx=cx+dx, ny=cy+dy;
+      if(nx<0||ny<0||nx>=GW||ny>=GH) continue;
+      if(!(flags[ny*GW+nx]&1)) return [nx,ny];
+    }
+    return null;
+  };
+  const sC=freeNear(...cellOf(x0m,y0m)), eC=freeNear(...cellOf(x1m,y1m));
+  if(!sC||!eC) return null;
+  // Scratch-Arrays wiederverwenden (30+ MB Allokation pro Wegsuche = GC-Ruckler bei vielen Einheiten);
+  // Gueltigkeit per Versionsstempel statt teurem fill()
+  if(!fpG||fpG.length!==GW*GH){ fpG=new Float64Array(GW*GH); fpCame=new Int32Array(GW*GH); fpVer=new Int32Array(GW*GH); fpClosedV=new Int32Array(GW*GH); fpVerN=0; }
+  const ver=++fpVerN;
+  const g={ get(i){ return fpVer[i]===ver?fpG[i]:Infinity; }, set(i,v){ fpVer[i]=ver; fpG[i]=v; } };
+  const came=fpCame, closed=fpClosedV;
+  const heap=[];
+  const push=(f,i)=>{ heap.push([f,i]); let c=heap.length-1; while(c>0){const p=(c-1)>>1; if(heap[p][0]<=heap[c][0])break; const t=heap[p];heap[p]=heap[c];heap[c]=t; c=p;} };
+  const pop=()=>{ const top=heap[0], last=heap.pop(); if(heap.length){ heap[0]=last; let c=0; for(;;){ let l=2*c+1,r2=l+1,m=c; if(l<heap.length&&heap[l][0]<heap[m][0])m=l; if(r2<heap.length&&heap[r2][0]<heap[m][0])m=r2; if(m===c)break; const t=heap[m];heap[m]=heap[c];heap[c]=t; c=m; } } return top; };
+  const sI=sC[1]*GW+sC[0], eI=eC[1]*GW+eC[0], ex=eC[0], ey=eC[1];
+  const DIAG=cell*Math.SQRT2, PEN=8;
+  g.set(sI,0); came[sI]=-1; push(0,sI);
+  let found=false, pops=0;
+  while(heap.length){
+    const [,i]=pop();
+    if(closed[i]===ver) continue;
+    closed[i]=ver;
+    if(i===eI){found=true;break;}
+    if(++pops>2500000) break;
+    const cx=i%GW, cy=(i/GW)|0, gi=fpG[i];
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy) continue;
+      const nx=cx+dx, ny=cy+dy;
+      if(nx<0||ny<0||nx>=GW||ny>=GH) continue;
+      const ni=ny*GW+nx;
+      if(flags[ni]&1) continue;
+      if(dx&&dy&&((flags[cy*GW+nx]&1)||(flags[ny*GW+cx]&1))) continue;
+      // diagonale Zaun-/Heckenlinien (1 Zelle duenn, nur eckverbunden) nicht
+      // durchschluepfen: quer dazu muss eine Barrierezelle betreten werden
+      if(dx&&dy&&(flags[cy*GW+nx]&2)&&(flags[ny*GW+cx]&2)&&!(flags[ni]&2)&&!(flags[i]&2)) continue;
+      let c2=((dx&&dy)?DIAG:cell)/speedFactor(flags[ni]);   // Zeit-Kosten: Strassen bevorzugt, Wasser meiden
+      // Klettern kostet echte Zeit: Dauer je Typ in Meter-Aequivalent (dur*WSPEED)
+      if((flags[ni]&2)&&!(flags[i]&2)) c2+=BARRTYP[grid.btype?grid.btype[ni]:0][0]*WSPEED;
+      const ng=gi+c2;
+      if(ng<g.get(ni)-1e-9){
+        g.set(ni,ng); came[ni]=i;
+        push(ng+Math.hypot(nx-ex,ny-ey)*cell*0.7, ni);      // 0.7 ≈ 1/max-Speed (zulaessige Heuristik)
+      }
+    }
+  }
+  if(!found) return null;
+  const cells=[];
+  for(let i=eI;i!==-1;i=came[i]) cells.push(i);
+  cells.reverse();
+  const evFrac=[]; let cum=0;
+  for(let i2=1;i2<cells.length;i2++){
+    const a=cells[i2-1], b=cells[i2];
+    cum+=((a%GW)!==(b%GW)&&((a/GW)|0)!==((b/GW)|0))?DIAG:cell;
+    if((flags[b]&2)&&!(flags[a]&2)) evFrac.push({f:cum,t:grid.btype?grid.btype[b]:0});
+  }
+  for(let i2=0;i2<evFrac.length;i2++) evFrac[i2].f/=Math.max(1e-9,cum);
+  const los=(a,b)=>{
+    // Glaettung darf weder Gebaeude (1) noch Barrieren (2) schneiden – sonst
+    // kuerzt der geglaettete Weg ueber Zaunecken ab und das Kletter-Event fehlt
+    const ax=(a%GW)+0.5, ay=((a/GW)|0)+0.5, bx=(b%GW)+0.5, by=((b/GW)|0)+0.5;
+    const steps=Math.ceil(Math.hypot(bx-ax,by-ay)*2);
+    for(let s2=1;s2<steps;s2++){
+      const t=s2/steps;
+      if(flags[Math.floor(ay+(by-ay)*t)*GW+Math.floor(ax+(bx-ax)*t)]&3) return false;
+    }
+    return true;
+  };
+  const simp=[cells[0]];
+  let i0=0;
+  while(i0<cells.length-1){
+    let j=cells.length-1;
+    while(j>i0+1&&!los(cells[i0],cells[j])) j--;
+    simp.push(cells[j]); i0=j;
+  }
+  const pts=simp.map(i2=>[((i2%GW)+0.5)*cell, (((i2/GW)|0)+0.5)*cell]);
+  pts[0]=[x0m,y0m];
+  return {pts, evFrac};
+}
+
+/* ============ Marker (Einheiten) ============ */
+const MCOLORS=["#c2452d","#2d6fc2","#2d9c57","#b58900","#8a4bc9","#c23d8f"];
+const markers=[];
+const sel=new Set();
+let placeMode=false, placeColor=MCOLORS[0];
+const WSPEED=9, CLIMB=3.5;
+const btnMk=document.getElementById("btnMk");
+btnMk.onclick=()=>{
+  placeMode=!placeMode;
+  btnMk.classList.toggle("active",placeMode);
+  document.getElementById("dt").classList.toggle("place",placeMode);
+  setStatus(placeMode?"Klicken setzt Marker in der gewählten Farbe (Modus bleibt aktiv – Button erneut klicken zum Beenden).":null);
+};
+const colorsEl=document.getElementById("colors");
+for(const c of MCOLORS){
+  const b=document.createElement("button");
+  b.className="cw"; b.style.background=c;
+  if(c===placeColor) b.classList.add("active");
+  b.onclick=()=>{
+    placeColor=c;
+    colorsEl.querySelectorAll(".cw").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    sel.clear(); redrawMarkers();
+    lastKnow=0; updateVision();
+    setStatus("Aktive Farbe gewechselt – nur diese Einheiten sind steuerbar.");
+  };
+  colorsEl.appendChild(b);
+}
+function drawMarkerEl(m){
+  if(!m.g){
+    m.g=document.createElementNS(NS,"g");
+    const bg=document.createElementNS(NS,"circle");
+    bg.setAttribute("class","hpbg"); bg.setAttribute("r",11);
+    m.g.appendChild(bg);
+    m.hpRing=document.createElementNS(NS,"circle");
+    m.hpRing.setAttribute("class","hpring"); m.hpRing.setAttribute("r",11);
+    m.hpRing.setAttribute("transform","rotate(-90)");
+    m.g.appendChild(m.hpRing);
+    const c=document.createElementNS(NS,"circle");
+    c.setAttribute("r",7); c.setAttribute("fill",m.color);
+    c.setAttribute("stroke","#fff"); c.setAttribute("stroke-width",2);
+    m.g.appendChild(c);
+    L.walk.appendChild(m.g);
+  }
+  m.g.style.opacity = (m.color===placeColor)?1:(m.dummy?.85:.5);
+  // Lebensanzeige: Ringsegment proportional zu HP
+  const hp=Math.max(0,(m.hp==null?3:m.hp));
+  const C=2*Math.PI*11;
+  m.hpRing.setAttribute("stroke",m.color);
+  m.hpRing.setAttribute("stroke-dasharray",(C*hp/3).toFixed(1)+" "+C.toFixed(1));
+  const isSel=sel.has(m);
+  if(isSel&&!m.ring){
+    m.ring=document.createElementNS(NS,"circle");
+    m.ring.setAttribute("class","mring"); m.ring.setAttribute("r",15);
+    m.ring.setAttribute("stroke",m.color);
+    m.g.appendChild(m.ring);
+  } else if(!isSel&&m.ring){ m.ring.remove(); m.ring=null; }
+  m.g.setAttribute("transform",`translate(${m.x} ${m.y}) scale(${1/dt.k})`);
+}
+function redrawMarkers(){ for(const m of markers) drawMarkerEl(m); }
+dt.onChange=()=>{ redrawMarkers(); };
+function drawRouteFor(m,pts){
+  if(!pts||pts.length<2){ if(m.line){m.line.remove(); m.line=null;} return; }
+  if(!m.line){
+    m.line=document.createElementNS(NS,"polyline");
+    m.line.setAttribute("class","routeline");
+    m.line.setAttribute("stroke",m.color);
+    L.walk.insertBefore(m.line, m.g);
+  }
+  m.line.setAttribute("points",pts.map(p=>p[0]+","+p[1]).join(" "));
+}
+function markerAt(sx,sy){
+  let best=null, bd=14;
+  for(const m of markers){
+    const d=Math.hypot(sx-(m.x*dt.k+dt.tx), sy-(m.y*dt.k+dt.ty));
+    if(d<bd){ bd=d; best=m; }
+  }
+  return best;
+}
+const toW=(sx,sy)=>[(sx-dt.tx)/dt.k,(sy-dt.ty)/dt.k];
+
+/* Fog of War: Nebel ueberall ausser in den Sichtfeldern der aktiven Farbe.
+   Fokus: Punkt (Rechtsklick) oder Richtung (Doppel-Rechtsklick) formt das Sichtfeld. */
+const VIS=80, RAYS=96;
+let fogRect=null;
+const angDiff=(a,b)=>{ let d=a-b; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; return d; };
+function headingOf(m){
+  if(!m.focus){
+    if(m.walk&&m.walkDir!=null) return m.walkDir;    // ohne Fokus: Blick in Laufrichtung
+    return null;
+  }
+  const t=m.focus.type;
+  if(t==="dir"||t==="facedir") return m.focus.ang;
+  return Math.atan2(m.focus.y-m.y, m.focus.x-m.x);   // point & facepoint tracken den Punkt
+}
+function radiusFor(m,rel){
+  const t=m.focus?m.focus.type:null;
+  let R;
+  if(t==="point"||t==="dir"){                    // FOKUS: enge Keule, weit nach vorn
+    const c=(1+Math.cos(rel))/2;
+    R=30+110*c*c*c;                              // vorn 140, seitlich ~44, hinten 30
+  } else if(t||(m.walk&&m.walkDir!=null)){       // Blickrichtung (auch beim Laufen ohne Fokus)
+    const c=Math.max(0,Math.min(1,(Math.cos(rel)+0.15)/0.3));
+    R=40+60*c;                                   // 180° gut (100) / 180° schlecht (40)
+  } else R=VIS;                                  // stehend ohne alles: rundum 80 m
+  if(m.carry==="enemy") R*=0.75;                 // gegnerische Flagge: weniger Sicht
+  else if(m.carry==="own") R*=1.15;              // eigene Flagge: mehr Sicht
+  return R;
+}
+/* Sichtpruefung mit Wald-Daempfung: Waldzellen kosten Sichtbudget –
+   von aussen nach innen viel (5x), von innen nach aussen weniger (2,5x) */
+function canSeeUnit(a,t){
+  if(!grid) return true;
+  const dist=Math.hypot(t.x-a.x,t.y-a.y);
+  const h=headingOf(a);
+  const ang=Math.atan2(t.y-a.y,t.x-a.x);
+  const R=h===null?radiusFor(a,0):radiusFor(a,angDiff(ang,h));
+  if(dist>R) return false;
+  const {flags,GW,GH,cell}=grid;
+  const inF=flagsAt(a.x,a.y)&16;
+  const steps=Math.max(1,Math.ceil(dist/cell));
+  let used=0;
+  for(let s2=1;s2<steps;s2++){
+    const tt=s2/steps;
+    const cx=Math.floor((a.x+(t.x-a.x)*tt)/cell), cy=Math.floor((a.y+(t.y-a.y)*tt)/cell);
+    if(cx<0||cy<0||cx>=GW||cy>=GH) return false;
+    const f=flags[cy*GW+cx];
+    if(f&4) return false;
+    used+=cell*((f&16)?(inF?2.5:5):1);
+    if(used>R) return false;
+  }
+  return true;
+}
+function canSee(m,active){
+  for(const a of active) if(canSeeUnit(a,m)) return true;
+  return false;
+}
+let visSig="", visLastT=0, foeLastT=0, visPending=false;
+function unitSig(m){
+  return ((m.x*4)|0)+","+((m.y*4)|0)+","
+    +(m.focus?(m.focus.type+"~"+((((m.focus.ang||0))*64)|0)+"~"+((m.focus.x||0)|0)+"_"+((m.focus.y||0)|0)):"")
+    +(m.walk&&m.walkDir!=null?("w"+((m.walkDir*64)|0)):"")
+    +(m.carry||"")+(sel.has(m)?"S":"");
+}
+function updateVision(force){
+  if(!grid||!area) return;
+  const holes=document.getElementById("fogholes");
+  const active=markers.filter(m=>m.color===placeColor);
+  if(!active.length){
+    if(fogRect) fogRect.style.display="none";
+    for(const m of markers) if(m.g){ m.g.style.display=""; }
+    L.focus.innerHTML="";
+    visSig="";
+    return;
+  }
+  if(fogRect) fogRect.style.display="";
+  const now=performance.now();
+  // Nur neu rendern, wenn sich am Zustand der eigenen Einheiten etwas geaendert hat
+  // (Fog-Maske + Blur-Filter sind der teuerste Teil des Frames), max. ~22 Hz
+  const sig=placeColor+"|"+active.map(unitSig).join(";");
+  const sigChanged=sig!==visSig;
+  if(sigChanged&&!force&&now-visLastT<45){
+    if(!visPending){ visPending=true; requestAnimationFrame(()=>{ visPending=false; updateVision(); }); }
+  } else if(sigChanged||force){
+    visSig=sig; visLastT=now;
+    const {flags,GW,GH,cell}=grid;
+    const NRAYS=active.length<=4?RAYS:(active.length<=8?64:(active.length<=16?48:36));
+    let d="";
+    for(const m of active){
+      const h=headingOf(m);
+      const inF=flagsAt(m.x,m.y)&16;
+      let poly="";
+      for(let r=0;r<NRAYS;r++){
+        const a=r/NRAYS*2*Math.PI;
+        const R=h===null?radiusFor(m,0):radiusFor(m,angDiff(a,h));
+        const dx=Math.cos(a), dy=Math.sin(a);
+        let dist=R, used=0, t=0;
+        for(;;){
+          t+=cell;
+          if(t>=R){ dist=R; break; }
+          const cx=Math.floor((m.x+dx*t)/cell), cy=Math.floor((m.y+dy*t)/cell);
+          if(cx<0||cy<0||cx>=GW||cy>=GH){ dist=t; break; }
+          const f=flags[cy*GW+cx];
+          if(f&4){ dist=t; break; }
+          used+=cell*((f&16)?(inF?2.5:5):1);
+          if(used>=R){ dist=t; break; }
+        }
+        poly+=(r?"L":"M")+(m.x+dx*dist).toFixed(1)+" "+(m.y+dy*dist).toFixed(1);
+      }
+      d+=poly+"Z";
+    }
+    holes.setAttribute("d",d);
+    drawFocus(active);
+  }
+  updateKnowledge(false);
+  // Fremde Einheiten nur zeigen, wenn eine aktive Einheit Sichtlinie hat (8 Hz reicht)
+  if(force||now-foeLastT>=120){
+    foeLastT=now;
+    for(const m of markers){
+      if(!m.g) continue;
+      if(m.color===placeColor){ m.g.style.display=""; continue; }
+      const visible=canSee(m,active);
+      m.g.style.display=visible?"":"none";
+      if(m.line) m.line.style.display=visible?"":"none";
+    }
+  }
+}
+
+/* Befehle */
+function startWalk(m,res){
+  const cum=[0];
+  for(let i=1;i<res.pts.length;i++) cum.push(cum[i-1]+Math.hypot(res.pts[i][0]-res.pts[i-1][0],res.pts[i][1]-res.pts[i-1][1]));
+  const total=cum[cum.length-1];
+  m.walk={pts:res.pts,cum,total,dist:0,
+    events:res.evFrac.map(e=>({at:e.f*total,d:BARRTYP[e.t][0],nr:BARRTYP[e.t][1]})),
+    evI:0,pause:0};
+  if(!m.dummy) drawRouteFor(m,res.pts);
+}
+async function routeAll(list,targets){
+  setStatus("Berechne Wege …");
+  await new Promise(r=>setTimeout(r,20));
+  let ok=0;
+  for(let i=0;i<list.length;i++){
+    const m=list[i];
+    if(m.walk){ m.walk=null; drawRouteFor(m,null); }
+    const res=findPath(m.x,m.y,targets[i][0],targets[i][1]);
+    if(!res) continue;
+    startWalk(m,res); ok++;
+    if(list.length>3&&i%2===1) await new Promise(r=>setTimeout(r,0));
+  }
+  if(!ok){ setStatus("Kein Weg gefunden."); return; }
+  ensureAnim();
+}
+function spread(cx,cy,n){
+  const s=3.5, cols=Math.ceil(Math.sqrt(n)), rows=Math.ceil(n/cols), pts=[];
+  for(let i=0;i<n;i++){
+    const r=Math.floor(i/cols), c=i%cols;
+    pts.push([cx+(c-(cols-1)/2)*s, cy+(r-(rows-1)/2)*s]);
+  }
+  return pts;
+}
+function commandPoint(wx,wy){
+  const list=[...sel];
+  routeAll(list, spread(wx,wy,list.length));
+}
+function commandCurve(trail){
+  const list=[...sel];
+  const n=list.length;
+  // Bogenlaenge der gezeichneten Linie
+  const cum=[0];
+  for(let i=1;i<trail.length;i++) cum.push(cum[i-1]+Math.hypot(trail[i][0]-trail[i-1][0],trail[i][1]-trail[i-1][1]));
+  const total=cum[cum.length-1];
+  const at=d=>{
+    let i=1;
+    while(i<cum.length&&cum[i]<d) i++;
+    if(i>=cum.length) return trail[trail.length-1];
+    const t=(d-cum[i-1])/Math.max(1e-9,cum[i]-cum[i-1]);
+    return [trail[i-1][0]+(trail[i][0]-trail[i-1][0])*t, trail[i-1][1]+(trail[i][1]-trail[i-1][1])*t];
+  };
+  const targets=[];
+  for(let i=0;i<n;i++) targets.push(at(n===1?total:total*i/(n-1)));
+  // Zuordnung entlang der Sehne (Anfang->Ende), damit sich Wege wenig kreuzen
+  const a=trail[0], b=trail[trail.length-1];
+  const dx=b[0]-a[0], dy=b[1]-a[1];
+  list.sort((m1,m2)=>((m1.x-a[0])*dx+(m1.y-a[1])*dy)-((m2.x-a[0])*dx+(m2.y-a[1])*dy));
+  routeAll(list,targets);
+}
+
+/* Interaktion Detailkarte */
+const selrectEl=document.getElementById("selrect");
+const cmdlineEl=document.getElementById("cmdline");
+let cmdTrail=[], trailActive=false;
+dt.onClick=(sx,sy)=>{
+  const [wx,wy]=toW(sx,sy);
+  if(phase==="chooseFlag"&&flags&&flags.cand){
+    const d0=Math.hypot(wx-flags.cand[0].x,wy-flags.cand[0].y), d1=Math.hypot(wx-flags.cand[1].x,wy-flags.cand[1].y);
+    if(Math.min(d0,d1)<40) chooseFlagAt(d0<d1?0:1);
+    else setStatus("Klicke auf eine der beiden markierten Flaggen-Positionen.");
+    return;
+  }
+  if(phase==="chooseSet"&&defusal&&defusal.sets){
+    const ds=defusal.sets.map(s=>Math.hypot(wx-s.spawn.x,wy-s.spawn.y));
+    const i=ds[0]<=ds[1]?0:1;
+    if(ds[i]<40) chooseSetAt(i);
+    else setStatus("Klicke auf „Spawn 1“ oder „Spawn 2“, um die Konstellation zu wählen.");
+    return;
+  }
+  if(placeMode){
+    if(combatOn||phase!=="idle"){ setStatus("Spiel läuft – keine neuen Marker. Erst ⏹ Beenden."); return; }
+    // auf naechste begehbare Stelle schnappen (nicht in Gebaeuden/Wasser stehen)
+    let px=wx, py=wy;
+    if(grid){
+      const {flags,GW,GH,cell}=grid;
+      let cx=Math.min(GW-1,Math.max(0,Math.floor(wx/cell))), cy=Math.min(GH-1,Math.max(0,Math.floor(wy/cell)));
+      if(flags[cy*GW+cx]&1){
+        outer: for(let r=1;r<120;r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+          if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue;
+          const nx=cx+dx, ny=cy+dy;
+          if(nx<0||ny<0||nx>=GW||ny>=GH) continue;
+          if(!(flags[ny*GW+nx]&1)){ cx=nx; cy=ny; break outer; }
+        }
+        px=(cx+0.5)*cell; py=(cy+0.5)*cell;
+      }
+    }
+    const m={x:px,y:py,color:placeColor,walk:null};
+    markers.push(m); drawMarkerEl(m); updateVision();
+    setStatus("Marker gesetzt ("+markers.length+" gesamt).");
+    return;
+  }
+  const hit=markerAt(sx,sy);
+  if(hit){
+    if(hit.color!==placeColor){ setStatus("Diese Einheit gehört einer anderen Farbe – Farbe oben wechseln."); return; }
+    sel.clear(); sel.add(hit); redrawMarkers(); updateVision();
+    setStatus("1 Einheit ausgewählt – Linie ziehen: bewegen (kurz = Punkt) · Rechtsklick: Fokus · Klick ins Leere: abwählen");
+    return;
+  }
+  if(sel.size){ sel.clear(); redrawMarkers(); updateVision(); setStatus(null); }
+};
+dt.onLeftDragMove=(x0,y0,x,y)=>{
+  if(placeMode) return;
+  if(sel.size){
+    if(!trailActive){ trailActive=true; cmdTrail=[[x0,y0]]; }
+    const last=cmdTrail[cmdTrail.length-1];
+    if(Math.hypot(x-last[0],y-last[1])>5) cmdTrail.push([x,y]);
+    cmdlineEl.style.display="block";
+    cmdlineEl.setAttribute("points",cmdTrail.map(p=>p[0]+","+p[1]).join(" ")+" "+x+","+y);
+  } else {
+    const rx=Math.min(x0,x), ry=Math.min(y0,y);
+    selrectEl.style.display="block";
+    selrectEl.style.left=rx+"px"; selrectEl.style.top=ry+"px";
+    selrectEl.style.width=Math.abs(x-x0)+"px";
+    selrectEl.style.height=Math.abs(y-y0)+"px";
+  }
+};
+dt.onLeftDragEnd=(x0,y0,x1,y1)=>{
+  cmdlineEl.style.display="none";
+  selrectEl.style.display="none";
+  if(placeMode) return;
+  if(sel.size){
+    if(!trailActive) cmdTrail=[[x0,y0]];
+    trailActive=false;
+    cmdTrail.push([x1,y1]);
+    commandCurve(cmdTrail.map(p=>toW(p[0],p[1])));
+    cmdTrail=[];
+    return;
+  }
+  const [ax,ay]=toW(Math.min(x0,x1),Math.min(y0,y1));
+  const [bx,by]=toW(Math.max(x0,x1),Math.max(y0,y1));
+  sel.clear();
+  for(const m of markers) if(m.color===placeColor&&m.x>=ax&&m.x<=bx&&m.y>=ay&&m.y<=by) sel.add(m);
+  redrawMarkers(); updateVision();
+  setStatus(sel.size?(sel.size+" Einheit(en) ausgewählt – Linie/Bogen ziehen: bewegen & verteilen · Rechtsklick: Fokus · Klick ins Leere: abwählen"):null);
+};
+dt.onDblClick=(sx,sy)=>{
+  const hit=markerAt(sx,sy);
+  if(hit&&hit.color===placeColor){
+    if(hit.g) hit.g.remove();
+    if(hit.line) hit.line.remove();
+    markers.splice(markers.indexOf(hit),1);
+    sel.delete(hit);
+    updateVision();
+    setStatus(null);
+  }
+};
+
+/* Fokus-Gesten (rechte Maustaste) */
+function addFocusLine(x1,y1,x2,y2,col,dash){
+  const l=document.createElementNS(NS,"line");
+  l.setAttribute("x1",x1); l.setAttribute("y1",y1);
+  l.setAttribute("x2",x2); l.setAttribute("y2",y2);
+  l.setAttribute("stroke",col); l.setAttribute("stroke-width",1.6);
+  l.setAttribute("stroke-dasharray",dash||"5 4");
+  l.setAttribute("vector-effect","non-scaling-stroke");
+  L.focus.appendChild(l);
+}
+function drawFocus(active){
+  L.focus.innerHTML="";
+  const pts=new Map();
+  for(const m of active){
+    if(!m.focus) continue;
+    const isSel=sel.has(m);
+    const col=isSel?"#1c1c1a":"#8d8d86";
+    const t=m.focus.type;
+    const dash=(t==="point"||t==="dir")?"5 4":"1.5 5";   // Fokus gestrichelt, Blick gepunktet
+    if(t==="point"||t==="facepoint"){
+      addFocusLine(m.x,m.y,m.focus.x,m.focus.y,col,dash);
+      const key=Math.round(m.focus.x)+","+Math.round(m.focus.y);
+      const e=pts.get(key);
+      if(!e) pts.set(key,{x:m.focus.x,y:m.focus.y,sel:isSel});
+      else e.sel=e.sel||isSel;
+    } else {
+      const FL=55;
+      addFocusLine(m.x,m.y,m.x+Math.cos(m.focus.ang)*FL,m.y+Math.sin(m.focus.ang)*FL,col,dash);
+    }
+  }
+  for(const e of pts.values()){
+    const c=document.createElementNS(NS,"circle");
+    c.setAttribute("cx",e.x); c.setAttribute("cy",e.y); c.setAttribute("r",2.6);
+    c.setAttribute("fill",e.sel?"#1c1c1a":"#8d8d86");
+    c.setAttribute("stroke","#fff"); c.setAttribute("stroke-width",1);
+    c.setAttribute("vector-effect","non-scaling-stroke");
+    L.focus.appendChild(c);
+  }
+}
+function centerAngTo(sx,sy){
+  const [wx,wy]=toW(sx,sy);
+  let cx=0,cy=0;
+  for(const m of sel){cx+=m.x;cy+=m.y;}
+  cx/=sel.size; cy/=sel.size;
+  return Math.atan2(wy-cy,wx-cx);
+}
+function setFocusPoint(sx,sy){
+  const [wx,wy]=toW(sx,sy);
+  for(const m of sel) m.focus={type:"point",x:wx,y:wy};
+  updateVision();
+  setStatus("Fokus auf Punkt ("+sel.size+" Einheit(en)) – enge Sicht, beobachtet den Punkt auch beim Laufen.");
+}
+function setFocusDirParallel(sx,sy){
+  const ang=centerAngTo(sx,sy);
+  for(const m of sel) m.focus={type:"dir",ang};
+  updateVision();
+  setStatus("Fokus in Richtung (parallel) – enge Sicht, Richtung bleibt beim Laufen erhalten.");
+}
+function setFacePoint(sx,sy){
+  const [wx,wy]=toW(sx,sy);
+  for(const m of sel) m.focus={type:"facepoint",x:wx,y:wy};
+  updateVision();
+  setStatus("Blickrichtung auf Punkt – kein Fokus, 180° gute Sicht zum Punkt.");
+}
+function setFaceDirParallel(sx,sy){
+  const ang=centerAngTo(sx,sy);
+  for(const m of sel) m.focus={type:"facedir",ang};
+  updateVision();
+  setStatus("Blickrichtung parallel – kein Fokus, 180° gute Sicht in Klickrichtung.");
+}
+function clearFocus(){
+  for(const m of sel) m.focus=null;
+  updateVision();
+  setStatus("Rundumsicht wiederhergestellt.");
+}
+/* Ziele entlang einer Linie auf die Auswahl verteilen (sortiert entlang der Sehne) */
+function lineAssign(trail){
+  const list=[...sel];
+  const n=list.length;
+  const cum=[0];
+  for(let i=1;i<trail.length;i++) cum.push(cum[i-1]+Math.hypot(trail[i][0]-trail[i-1][0],trail[i][1]-trail[i-1][1]));
+  const total=cum[cum.length-1];
+  const at=d=>{
+    let i=1;
+    while(i<cum.length&&cum[i]<d) i++;
+    if(i>=cum.length) return trail[trail.length-1];
+    const t=(d-cum[i-1])/Math.max(1e-9,cum[i]-cum[i-1]);
+    return [trail[i-1][0]+(trail[i][0]-trail[i-1][0])*t, trail[i-1][1]+(trail[i][1]-trail[i-1][1])*t];
+  };
+  const targets=[];
+  for(let i=0;i<n;i++) targets.push(at(n===1?total:total*i/(n-1)));
+  const a=trail[0], b=trail[trail.length-1];
+  const dx=b[0]-a[0], dy=b[1]-a[1];
+  list.sort((m1,m2)=>((m1.x-a[0])*dx+(m1.y-a[1])*dy)-((m2.x-a[0])*dx+(m2.y-a[1])*dy));
+  return {list,targets};
+}
+function applyGazeLine(trail,withFocus){
+  const {list,targets}=lineAssign(trail);
+  for(let i=0;i<list.length;i++){
+    list[i].focus={type:withFocus?"point":"facepoint", x:targets[i][0], y:targets[i][1]};
+  }
+  updateVision();
+  setStatus((withFocus?"Fokus":"Blick")+"-Ziele entlang der Linie verteilt ("+list.length+" Einheit(en)).");
+}
+
+/* Rechte Maustaste: kurz = Blick, halten = Fokus (Cursor zeigt den Haltestatus) */
+const HOLDMS=500;
+const rcurEl=document.getElementById("rcur");
+const rcurX=document.getElementById("rcurX"), rcurP=document.getElementById("rcurP");
+let rGest=null, rHoldIv=0, rLastUp=0, rTimer=0, rIsSecond=false, rTrail=[];
+function rcurUpdate(){
+  if(!rGest) return;
+  const ref=rGest.moved?rGest.lastMove:rGest.t0;
+  const hold=(performance.now()-ref)>=HOLDMS;
+  rcurX.style.display=hold?"none":"";
+  rcurP.style.display=hold?"":"none";
+}
+dt.el.addEventListener("pointermove",e=>{
+  if(!rGest) return;
+  rcurEl.style.left=e.clientX+"px";
+  rcurEl.style.top=e.clientY+"px";
+});
+dt.onRightDown=(sx,sy)=>{
+  rIsSecond=(performance.now()-rLastUp)<350;    // Doppelklick am zweiten DRUECKEN erkennen
+  if(rIsSecond) clearTimeout(rTimer);
+  rGest={t0:performance.now(), lastMove:0, moved:false};
+  rTrail=[[sx,sy]];
+  if(area&&sel.size){
+    rcurEl.style.left=sx+"px"; rcurEl.style.top=sy+"px";
+    rcurEl.style.display="block";
+    rcurUpdate();
+    clearInterval(rHoldIv); rHoldIv=setInterval(rcurUpdate,80);
+  }
+};
+dt.onRightDragMove=(x0,y0,x,y)=>{
+  if(!rGest) return;
+  rGest.moved=true; rGest.lastMove=performance.now();
+  const last=rTrail[rTrail.length-1];
+  if(Math.hypot(x-last[0],y-last[1])>5) rTrail.push([x,y]);
+  if(area&&sel.size){
+    cmdlineEl.style.display="block";
+    cmdlineEl.style.stroke="#1c1c1a";
+    cmdlineEl.setAttribute("points",rTrail.map(p=>p[0]+","+p[1]).join(" ")+" "+x+","+y);
+  }
+};
+dt.onRightUp=(sx,sy,dur,moved)=>{
+  clearInterval(rHoldIv);
+  rcurEl.style.display="none";
+  cmdlineEl.style.display="none"; cmdlineEl.style.stroke="";
+  const g=rGest; rGest=null;
+  // Wahlphase: Rechtsklick verschiebt den naechstgelegenen Vorschlags-Punkt
+  if(area&&(phase==="chooseFlag"||phase==="chooseSet")){
+    const [wx,wy]=toW(sx,sy);
+    const pts=[];
+    if(phase==="chooseFlag"&&flags&&flags.cand) for(const c of flags.cand) pts.push(c);
+    if(phase==="chooseSet"&&defusal&&defusal.sets) for(const s of defusal.sets){ pts.push(s.a,s.b,s.spawn); }
+    let best=null,bd=1e18;
+    for(const p of pts){ const d=Math.hypot(p.x-wx,p.y-wy); if(d<bd){bd=d;best=p;} }
+    if(best){
+      const q=snapFreeXY(wx,wy,playerComp());
+      best.x=q[0]; best.y=q[1];
+      drawObjectives();
+      setStatus("Punkt verschoben. Rechtsklick = nächstgelegenen Punkt hierher verschieben · Linksklick auf Punkt = bestätigen.");
+    }
+    rIsSecond=false;
+    return;
+  }
+  if(!area||!sel.size){ rIsSecond=false; return; }
+  if(moved&&g){                                            // Linie gezogen: Blick-/Fokus-Ziele verteilen
+    rIsSecond=false; rLastUp=0;
+    const still=performance.now()-g.lastMove;
+    rTrail.push([sx,sy]);
+    applyGazeLine(rTrail.map(p=>toW(p[0],p[1])), still>=HOLDMS);
+    return;
+  }
+  if(rIsSecond){                                           // Doppelklick: parallel
+    rIsSecond=false; rLastUp=0;
+    if(dur>=HOLDMS) setFocusDirParallel(sx,sy);            // gehalten: FOKUS parallel
+    else setFaceDirParallel(sx,sy);                        // kurz: Blick parallel
+    return;
+  }
+  rLastUp=performance.now();
+  if(dur>=HOLDMS){ rLastUp=0; setFocusPoint(sx,sy); return; }  // gehalten: FOKUS auf Punkt
+  clearTimeout(rTimer);
+  rTimer=setTimeout(()=>{ setFacePoint(sx,sy); },360);         // kurz: Blick auf Punkt
+};
+
+/* ===== Gefecht: Dummys, Patrouillen, Schiessen ===== */
+const ENEMY_COLOR="#3a3a35";
+let combatOn=false, lastCombat=0, enemyTotal=0, ownTotal=0;
+function updateScore(){
+  const el=document.getElementById("score");
+  if(!combatOn){ el.style.display="none"; return; }
+  const eAlive=markers.filter(m=>m.dummy&&!m.dead).length;
+  const oAlive=markers.filter(m=>!m.dummy&&!m.dead).length;
+  el.style.display="";
+  el.textContent=`Eigene ${oAlive}/${ownTotal} · Gegner ${eAlive}/${enemyTotal}`;
+  if(eAlive===0){
+    if((gameMode==="ctf"||gameMode==="defusal")&&!gameOver) winGame("🎉 Alle Gegner ausgeschaltet – gewonnen!");
+    else setStatus("🎉 Alle Gegner ausgeschaltet!");
+  } else if(oAlive===0){
+    if((gameMode==="ctf"||gameMode==="defusal")&&!gameOver) winGame("Alle eigenen Einheiten verloren – Niederlage.");
+    else setStatus("Alle eigenen Einheiten verloren.");
+  }
+}
+function killUnit(m){
+  m.dead=true;
+  if(m.dummy){
+    // Gefahrenzone: hier ist ein Kamerad gefallen – 40 s meiden, Ueberlebende planen um
+    dangerZones.push({x:m.x,y:m.y,until:performance.now()+40000});
+    for(const u of markers){
+      if(!u.dummy||u.dead||u.role!=="atk") continue;
+      if(Math.hypot(u.x-m.x,u.y-m.y)<80){ u.walk=null; u.atkPhase=0; u.nextAi=performance.now()+1000+Math.random()*2000; }
+    }
+  }
+  if(m.g){ m.g.remove(); m.g=null; }
+  if(m.line){ m.line.remove(); m.line=null; }
+  const g=document.createElementNS(NS,"g");
+  const px=document.createElementNS(NS,"path");
+  px.setAttribute("d","M-4 -4 L4 4 M-4 4 L4 -4");
+  px.setAttribute("stroke","#6d6d68"); px.setAttribute("stroke-width",2);
+  px.setAttribute("fill","none"); px.setAttribute("vector-effect","non-scaling-stroke");
+  g.appendChild(px);
+  g.setAttribute("transform",`translate(${m.x} ${m.y})`);
+  L.walk.insertBefore(g,L.walk.firstChild);
+  markers.splice(markers.indexOf(m),1);
+  sel.delete(m);
+  updateVision(true);
+  updateScore();
+}
+function tracer(s,pt,hit){
+  const l=document.createElementNS(NS,"line");
+  l.setAttribute("x1",s.x); l.setAttribute("y1",s.y);
+  l.setAttribute("x2",pt[0]); l.setAttribute("y2",pt[1]);
+  l.setAttribute("stroke",s.dummy?ENEMY_COLOR:s.color);
+  l.setAttribute("stroke-width",hit?1.8:1);
+  l.setAttribute("vector-effect","non-scaling-stroke");
+  l.setAttribute("opacity",".85");
+  L.walk.appendChild(l);
+  setTimeout(()=>l.remove(),130);
+}
+function spawnDummies(n){
+  const {flags,GW,GH,cell,comp}=grid;
+  const players=markers.filter(m=>!m.dummy);
+  const pComps=new Set(players.map(p=>compAt(p.x,p.y)));   // nur Bereiche mit eigenen Einheiten
+  const minDists=[150,60,0];
+  let cands=[];
+  for(const minD of minDists){
+    cands=[];
+    for(let i=0;i<2500&&cands.length<400;i++){
+      const cx=(Math.random()*GW)|0, cy=(Math.random()*GH)|0;
+      const f=flags[cy*GW+cx];
+      if(f&1||f&8) continue;
+      if(!pComps.has(comp[cy*GW+cx])) continue;
+      const x=(cx+0.5)*cell, y=(cy+0.5)*cell;
+      let dn=1e9;
+      for(const p of players) dn=Math.min(dn,Math.hypot(p.x-x,p.y-y));
+      if(dn<minD) continue;
+      addCand(cands,cx,cy,x,y,dn,flags,GW,GH);
+    }
+    if(cands.length>=n) break;
+  }
+  return finishSpawn(cands,n,players);
+}
+function addCand(cands,cx,cy,x,y,dn,flags,GW,GH){
+    let cover=0;
+    for(const [ox,oy] of [[3,0],[-3,0],[0,3],[0,-3]]){
+      const nx=cx+ox, ny=cy+oy;
+      if(nx>=0&&ny>=0&&nx<GW&&ny<GH&&(flags[ny*GW+nx]&1)) cover=1;
+    }
+  cands.push({x,y,score:-Math.abs(dn-280)+cover*70+Math.random()*40});
+}
+function finishSpawn(cands,n,players){
+  cands.sort((a,b)=>b.score-a.score);
+  const placed=[];
+  for(const c of cands){
+    if(placed.length>=n) break;
+    if(placed.some(p=>Math.hypot(p.x-c.x,p.y-c.y)<45)) continue;
+    placed.push(c);
+  }
+  for(const c of placed){
+    const m={x:c.x,y:c.y,color:ENEMY_COLOR,dummy:true,hp:3,walk:null};
+    let np=null,nd=1e9;
+    for(const p of players){ const d=Math.hypot(p.x-c.x,p.y-c.y); if(d<nd){nd=d;np=p;} }
+    const ang=np?Math.atan2(np.y-c.y,np.x-c.x):Math.random()*6.283;
+    const roll=Math.random();
+    if(roll<0.35) m.focus={type:"dir",ang};           // mit Fokus
+    else if(roll<0.85) m.focus={type:"facedir",ang};  // nur Blickrichtung
+    if(Math.random()<0.5){
+      for(let tr=0;tr<8;tr++){
+        const pa=Math.random()*6.283, pd=40+Math.random()*55;
+        const res=findPath(c.x,c.y,c.x+Math.cos(pa)*pd,c.y+Math.sin(pa)*pd);
+        if(res&&res.pts.length>1){
+          m.patrol={ptsA:res.pts,ptsB:[...res.pts].reverse(),dirA:true,nextAt:performance.now()+1000+Math.random()*4000};
+          break;
+        }
+      }
+    }
+    markers.push(m); drawMarkerEl(m);
+  }
+  updateVision(true);
+  return placed.length;
+}
+function patrolStep(now){
+  for(const m of markers){
+    if(!m.dummy||m.dead||!m.patrol||m.walk) continue;
+    if(m.patrol.nextAt==null){ m.patrol.nextAt=now+1500+Math.random()*3000; continue; }
+    if(now>=m.patrol.nextAt){
+      m.patrol.nextAt=null;
+      const pts=(m.patrol.dirA?m.patrol.ptsA:m.patrol.ptsB).map(p=>[p[0],p[1]]);
+      m.patrol.dirA=!m.patrol.dirA;
+      pts[0]=[m.x,m.y];
+      startWalk(m,{pts,evFrac:[]});
+      ensureAnim();
+    }
+  }
+}
+function combatStep(now){
+  if(gameOver) return;
+  if(now-lastCombat<150) return;
+  lastCombat=now;
+  const dummiesL=[], ownsL=[];
+  for(const m of markers) if(!m.dead) (m.dummy?dummiesL:ownsL).push(m);
+  for(const s of [...markers]){
+    if(s.dead) continue;
+    const foes=s.dummy?ownsL:dummiesL;
+    if(!foes.length) continue;
+    const hasFocus=s.focus&&(s.focus.type==="point"||s.focus.type==="dir");
+    const underFire=s.underFire&&(now-s.underFire<6000);
+    if(!s.dummy&&!hasFocus&&!underFire) continue;   // eigene nur mit Fokus oder unter Beschuss
+    if(s.nextShot&&now<s.nextShot) continue;
+    // Kandidaten nach Distanz sortieren, erster sichtbarer gewinnt (spart Sicht-Raycasts)
+    const cand=[];
+    for(const t of foes){
+      const d=Math.hypot(t.x-s.x,t.y-s.y);
+      if(d<200) cand.push([d,t]);
+    }
+    cand.sort((a,b)=>a[0]-b[0]);
+    let best=null,bd=1e9;
+    for(const [d,t] of cand){ if(canSeeUnit(s,t)){ bd=d; best=t; break; } }
+    if(!best) continue;
+    if(s.dummy){
+      enemyContact(s,best,now);             // Alarm/Spaeher-Rueckzug/Nachschub
+      lastContacts.push({x:best.x,y:best.y,t:now});   // Spieler gesichtet
+      if(lastContacts.length>25) lastContacts.shift();
+    }
+    const ang=Math.atan2(best.y-s.y,best.x-s.x);
+    const h=headingOf(s);
+    const inCone=hasFocus&&h!==null&&Math.abs(angDiff(ang,h))<0.6;
+    s.nextShot=now+(inCone?800:2000)+Math.random()*300;
+    s.lastShotT=now; s.lastShotDir=ang;
+    best.underFire=now;
+    best.threat={x:s.x,y:s.y};
+    if(best.dummy&&!s.dummy){ lastContacts.push({x:s.x,y:s.y,t:now}); if(lastContacts.length>25) lastContacts.shift(); }
+    const p=Math.min(0.9,(inCone?0.45:0.12)*Math.max(0.35,1-bd/170));
+    if(Math.random()<p){
+      tracer(s,[best.x,best.y],true);
+      best.hp=(best.hp==null?3:best.hp)-1;
+      if(best.hp<=0){ killUnit(best); setStatus((best.dummy?"Gegner":"Eigene Einheit")+" ausgeschaltet!"); }
+      else drawMarkerEl(best);
+    } else {
+      const off=(6+Math.random()*8), oa=ang+(Math.random()<0.5?1:-1)*Math.PI/2;
+      tracer(s,[best.x+Math.cos(oa)*off,best.y+Math.sin(oa)*off],false);
+    }
+    // Kameraden, die den Schuetzen sehen und keinen Befehl haben, blicken in Schussrichtung
+    for(const u of markers){
+      if(u.dead||u===s||u.dummy!==s.dummy||u.focus) continue;
+      if(canSeeUnit(u,s)) u.focus={type:"facedir",ang};
+    }
+  }
+}
+/* ===== Spielmodi ===== */
+let gameMode="skirmish", phase="idle", gameOver=false, gameMsg="";
+let flags=null, defusal=null;
+function snapFreeXY(x,y,cid){
+  // Optional cid: nur Zellen dieser Zusammenhangskomponente akzeptieren –
+  // sonst landet ein Snap gern im abgeschlossenen Innenhof nebenan (Einheiten stecken fest)
+  if(!grid) return [x,y];
+  const {flags:F,GW,GH,cell,comp}=grid;
+  let cx=Math.min(GW-1,Math.max(0,Math.floor(x/cell))), cy=Math.min(GH-1,Math.max(0,Math.floor(y/cell)));
+  const bad=i=>(F[i]&1)||(cid!=null&&comp[i]!==cid);
+  if(bad(cy*GW+cx)){
+    let hit=false;
+    outer: for(let r=1;r<300;r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+      if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue;
+      const nx=cx+dx, ny=cy+dy;
+      if(nx<0||ny<0||nx>=GW||ny>=GH) continue;
+      if(!bad(ny*GW+nx)){ cx=nx; cy=ny; hit=true; break outer; }
+    }
+    if(!hit&&cid!=null) return snapFreeXY(x,y);   // Notnagel ohne Komponenten-Filter
+  }
+  return [(cx+0.5)*cell,(cy+0.5)*cell];
+}
+function teleportUnits(cx,cy){
+  const own=markers.filter(m=>!m.dummy&&m.color===placeColor);
+  const pts=spread(cx,cy,own.length);
+  const cid=compAt(cx,cy);
+  own.forEach((m,i)=>{
+    const q=snapFreeXY(pts[i][0],pts[i][1],cid);
+    m.x=q[0]; m.y=q[1]; m.walk=null; m.walkDir=null; m.focus=null; m.carry=null;
+    drawRouteFor(m,null); drawMarkerEl(m);
+  });
+  sel.clear(); redrawMarkers();
+}
+function goodCands(compId,n){
+  const {flags:F,GW,GH,cell,comp}=grid;
+  const M=Math.ceil(35/cell);   // Randabstand: Ziele nie an der Kartenkante (Einheiten klemmen dort)
+  const out=[];
+  for(let i=0;i<6000&&out.length<n;i++){
+    const cx=M+((Math.random()*(GW-2*M))|0), cy=M+((Math.random()*(GH-2*M))|0);
+    const f=F[cy*GW+cx];
+    if(f&1||f&8) continue;
+    if(comp[cy*GW+cx]!==compId) continue;
+    // Deckungs-Scoring aus dem Taktik-Training: Wand/Ecke in 1-5 von 8 Richtungen
+    // = gut verteidigbare Stellung; 0 = freies Feld, >5 = Loch
+    let walls=0;
+    for(let a2=0;a2<8;a2++){
+      const nx=cx+Math.round(Math.cos(a2/8*2*Math.PI)*3), ny=cy+Math.round(Math.sin(a2/8*2*Math.PI)*3);
+      if(nx<0||ny<0||nx>=GW||ny>=GH) continue;
+      if(F[ny*GW+nx]&1) walls++;
+    }
+    const cover=(walls>=1&&walls<=5)?walls:0;
+    out.push({x:(cx+0.5)*cell,y:(cy+0.5)*cell,cover});
+  }
+  return out;
+}
+function playerComp(){
+  const p=markers.find(m=>!m.dummy&&m.color===placeColor);
+  return p?compAt(p.x,p.y):(grid.playable[0]??0);
+}
+function makeDummy(x,y,ang,role,anchor){
+  const m={x,y,color:ENEMY_COLOR,dummy:true,hp:3,walk:null,role:role||null,anchor:anchor||null,nextAi:0};
+  if(Math.random()<0.6) m.focus={type:"facedir",ang};
+  markers.push(m); drawMarkerEl(m);
+  return m;
+}
+function spawnEnemiesAt(cx,cy,count,role,faceTo){
+  const cid=compAt(cx,cy);
+  for(const p of spread(cx,cy,count)){
+    const q=snapFreeXY(p[0],p[1],cid);
+    const ang=faceTo?Math.atan2(faceTo.y-q[1],faceTo.x-q[0]):Math.random()*6.283;
+    makeDummy(q[0],q[1],ang,role,{x:cx,y:cy});
+  }
+}
+/* ===== Verteidigungs-Planer =====
+   Analysiert die Umgebung eines Spots: Anmarsch-Korridore (BFS), Engstellen
+   (minimale Gangbreite je Korridor), Wachposten mit Deckung + Sichtlinie auf
+   die Engstelle, Spaeher an den Korridormuendungen. */
+let planDist=null, planPrev=null, planQ=null;
+function canSeePoint(x0,y0,x1,y1){
+  const {flags,GW,GH,cell}=grid;
+  const d=Math.hypot(x1-x0,y1-y0), steps=Math.max(1,Math.ceil(d/cell));
+  for(let s=1;s<steps;s++){
+    const t=s/steps;
+    const cx=Math.floor((x0+(x1-x0)*t)/cell), cy=Math.floor((y0+(y1-y0)*t)/cell);
+    if(cx<0||cy<0||cx>=GW||cy>=GH) return false;
+    if(flags[cy*GW+cx]&4) return false;
+  }
+  return true;
+}
+function clearanceOf(i,maxR){
+  const {flags,GW,GH}=grid;
+  const cx=i%GW, cy=(i/GW)|0;
+  for(let r=1;r<=maxR;r++){
+    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+      if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue;
+      const nx=cx+dx, ny=cy+dy;
+      if(nx<0||ny<0||nx>=GW||ny>=GH) return r;
+      if(flags[ny*GW+nx]&1) return r;
+    }
+  }
+  return maxR+1;
+}
+function planDefense(sx,sy,nGuards,nScouts){
+  const {flags,GW,GH,cell}=grid;
+  const N=GW*GH;
+  if(!planDist||planDist.length!==N){ planDist=new Int32Array(N); planPrev=new Int32Array(N); planQ=new Int32Array(N); }
+  planDist.fill(-1);
+  const [qx,qy]=snapFreeXY(sx,sy);
+  const cid=compAt(qx,qy);
+  const scx=(qx/cell)|0, scy=(qy/cell)|0;
+  const si=scy*GW+scx;
+  const RMAX=Math.ceil(120/cell);
+  let qh=0,qt=0;
+  planDist[si]=0; planPrev[si]=-1; planQ[qt++]=si;
+  while(qh<qt){
+    const i=planQ[qh++];
+    const d=planDist[i];
+    if(d>=RMAX) continue;
+    const cx=i%GW, cy=(i/GW)|0;
+    if(cx>0){ const nn=i-1; if(!(flags[nn]&1)&&planDist[nn]<0){ planDist[nn]=d+1; planPrev[nn]=i; planQ[qt++]=nn; } }
+    if(cx<GW-1){ const nn=i+1; if(!(flags[nn]&1)&&planDist[nn]<0){ planDist[nn]=d+1; planPrev[nn]=i; planQ[qt++]=nn; } }
+    if(cy>0){ const nn=i-GW; if(!(flags[nn]&1)&&planDist[nn]<0){ planDist[nn]=d+1; planPrev[nn]=i; planQ[qt++]=nn; } }
+    if(cy<GH-1){ const nn=i+GW; if(!(flags[nn]&1)&&planDist[nn]<0){ planDist[nn]=d+1; planPrev[nn]=i; planQ[qt++]=nn; } }
+  }
+  // Anmarsch-Korridore: erreichbare Zellen im Ring 65–120 m, nach Richtung gebuendelt
+  const NB=16;
+  const bins=Array.from({length:NB},()=>({cnt:0,deep:-1,deepD:0}));
+  const dLo=Math.ceil(65/cell);
+  for(let k=0;k<qt;k++){
+    const i=planQ[k], d=planDist[i];
+    if(d<dLo) continue;
+    const cx=i%GW, cy=(i/GW)|0;
+    const b=(Math.floor((Math.atan2(cy-scy,cx-scx)+Math.PI)/(2*Math.PI)*NB)+NB)%NB;
+    bins[b].cnt++;
+    if(d>bins[b].deepD){ bins[b].deepD=d; bins[b].deep=i; }
+  }
+  const corridors=bins.filter(b=>b.cnt>=15&&b.deep>=0).sort((a,b)=>b.cnt-a.cnt);
+  const ctr=i=>[((i%GW)+0.5)*cell,(((i/GW)|0)+0.5)*cell];
+  const wallNear=i=>clearanceOf(i,4)<=3;
+  const guards=[], scouts=[];
+  // Je Korridor: Engstelle finden, Wachposten dahinter (spotseitig) mit Deckung + Sicht auf die Engstelle
+  for(let g=0;g<nGuards&&corridors.length;g++){
+    const cor=corridors[g%corridors.length];
+    let i=cor.deep, choke=-1, chokeW=1e9;
+    while(i>=0&&planDist[i]>Math.ceil(AIP.chokeNear/cell)){
+      const dM=planDist[i]*cell;
+      if(dM<=AIP.chokeFar){ const w=clearanceOf(i,8); if(w<chokeW){ chokeW=w; choke=i; } }
+      i=planPrev[i];
+    }
+    if(choke<0) choke=cor.deep;
+    const [chx,chy]=ctr(choke);
+    // Kandidaten auf der Kette Richtung Spot, 12–38 m hinter der Engstelle, plus seitliche Ausweicher
+    let best=null, bestS=-1e9, j=planPrev[choke];
+    while(j>=0&&planDist[j]>1){
+      const gap=(planDist[choke]-planDist[j])*cell;
+      if(gap>AIP.guardMax) break;
+      if(gap>=AIP.guardMin){
+        const cands=[j, j-2, j+2, j-2*GW, j+2*GW];
+        for(const c of cands){
+          if(c<0||c>=N||(flags[c]&1)) continue;
+          const [px,py]=ctr(c);
+          if(!canSeePoint(px,py,chx,chy)) continue;
+          const s=(wallNear(c)?3:0)+(1-Math.abs(gap-AIP.guardIdeal)/28)+Math.random()*0.7;
+          if(s>bestS){ bestS=s; best=c; }
+        }
+      }
+      j=planPrev[j];
+    }
+    if(best==null) best=choke;
+    const [px,py]=ctr(best);
+    guards.push({x:px,y:py,fx:chx,fy:chy,withFocus:Math.random()<AIP.focusShare});
+  }
+  // Rest ohne Korridor: Ring um den Spot, Blick nach aussen, Deckung bevorzugt
+  while(guards.length<nGuards){
+    const k=guards.length, ang=k*2.399963;   // goldener Winkel: gleichmaessig, nicht gitterig
+    const [px,py]=snapFreeXY(qx+Math.cos(ang)*AIP.ringR,qy+Math.sin(ang)*AIP.ringR,cid);
+    guards.push({x:px,y:py,fx:qx+Math.cos(ang)*70,fy:qy+Math.sin(ang)*70,withFocus:false});
+  }
+  // Spaeher: an die Muendung der groessten Korridore (~100 m), Blick weiter nach draussen
+  for(let s=0;s<nScouts;s++){
+    const cor=corridors[s%Math.max(1,corridors.length)];
+    if(!cor||cor.deep<0){ break; }
+    const [px,py]=ctr(cor.deep);
+    const ang=Math.atan2(py-qy,px-qx);
+    scouts.push({x:px,y:py,fx:px+Math.cos(ang)*50,fy:py+Math.sin(ang)*50,withFocus:false});
+  }
+  return {guards,scouts,spot:{x:qx,y:qy}};
+}
+function assignDefense(units,spot){
+  if(!units.length) return;
+  const nScout=units.length>=3?1:0;
+  const plan=planDefense(spot.x,spot.y,units.length-nScout,nScout);
+  const orders=[...plan.guards,...plan.scouts.map(o=>({...o,scout:true}))];
+  units.forEach((m,i)=>{
+    const o=orders[i%orders.length];
+    m.homeSpot={x:plan.spot.x,y:plan.spot.y};
+    m.anchor={x:plan.spot.x,y:plan.spot.y};
+    m.order={x:o.x,y:o.y,fx:o.fx,fy:o.fy,withFocus:!!o.withFocus};
+    m.role=o.scout?"scout":"def";
+    m.focus=null; m.nextAi=0;
+  });
+}
+/* Posten halten: hinlaufen, dort Fokus/Blick auf den zugewiesenen Punkt */
+function aiHoldOrder(m,now){
+  let o=m.order;
+  if(m.tempOrder){
+    if(now<m.tempOrder.until) o=m.tempOrder;
+    else { m.tempOrder=null; m.focus=null; m.nextAi=0; }
+  }
+  if(!o){ if(m.anchor) wanderNear(m,now,m.anchor.x,m.anchor.y,45); return; }
+  const d=Math.hypot(m.x-o.x,m.y-o.y);
+  if(d>4){
+    if(!m.walk&&now>(m.nextAi||0)){
+      const r=findPath(m.x,m.y,o.x,o.y);
+      if(r&&r.pts.length>1) startWalk(m,r);
+      m.nextAi=now+2500+Math.random()*2000;
+    }
+  } else if(!m.walk&&!(m.focus&&m.focus.__noise)&&(!m.focus||m.focus.__o!==o)){
+    m.focus={type:o.withFocus?"point":"facepoint",x:o.fx,y:o.fy,__o:o};
+  }
+}
+/* ===== Taktik-KI: Trupps, Stellungsanalyse, Bounding-Advance =====
+   Gefallene hinterlassen 40 s Gefahrenzonen; Trupps zu 3-4 Soldaten, jeder in
+   seinem lateralen Band; Karte wird auf leicht verteidigbare Stellungen (Ecken/
+   Kanten mit Deckung) analysiert; Vorrücken im Überschlag: eine Hälfte läuft,
+   die andere sichert mit Fokus auf die wahrscheinlichste Spielerposition. */
+/* Taktik-Parameter zentral & von aussen setzbar (Evolutions-Training):
+   atk* = Angreifer-Trupps, def* = Stellungsverteidigung */
+const AIP=window.AIP={
+  // Werte aus Selbstspiel-Evolution 2026-08-25, Lauf 2 (26 Generationen):
+  // Angreifer: schneller denken, kuerzer decken, breiter flanken; Verteidiger: naeher an die Engstelle, mehr Fokus
+  advMin:38, advMax:143, band:141, squadSize:3.75, thinkMs:558, planPause:1500, planPauseRnd:2880,
+  coverMin:3100, coverRnd:2780,
+  guardMin:10.6, guardMax:37.6, chokeNear:16.6, chokeFar:54.6, guardIdeal:17, focusShare:0.69, ringR:19
+};
+let dangerZones=[], strongpoints=null, squads=[], lastContacts=[];
+function seekCover(m,now){
+  if(!(m.underFire&&now-m.underFire<3000)||m.covering) return false;
+  m.covering=now+AIP.coverMin+Math.random()*AIP.coverRnd;
+  m.walk=null;
+  const th=m.threat;
+  let best=null,bs=-1e9;
+  for(let a2=0;a2<8;a2++){
+    const ang=a2/8*2*Math.PI;
+    const q=snapFreeXY(m.x+Math.cos(ang)*12,m.y+Math.sin(ang)*12,compAt(m.x,m.y));
+    let s2=Math.random();
+    if(th){
+      s2+=(Math.hypot(q[0]-th.x,q[1]-th.y)-Math.hypot(m.x-th.x,m.y-th.y))*0.05;
+      if(!canSeePoint(q[0],q[1],th.x,th.y)) s2+=3;   // hinter Sichtdeckung
+    }
+    if(s2>bs){ bs=s2; best=q; }
+  }
+  if(best){ const r=findPath(m.x,m.y,best[0],best[1]); if(r) startWalk(m,r); }
+  return true;
+}
+function computeStrongpoints(){
+  // leicht zu verteidigen: freie Zelle mit Wand/Ecke in 1-5 von 8 Richtungen
+  const {flags,GW,GH,cell}=grid;
+  const pts=[];
+  for(let i=0;i<12000&&pts.length<400;i++){
+    const cx=(Math.random()*GW)|0, cy=(Math.random()*GH)|0;
+    const f=flags[cy*GW+cx];
+    if(f&(1|8|32)) continue;               // nicht auf Strassen: zu exponiert
+    let walls=0;
+    for(let a=0;a<8;a++){
+      const nx=cx+Math.round(Math.cos(a/8*2*Math.PI)*3), ny=cy+Math.round(Math.sin(a/8*2*Math.PI)*3);
+      if(nx<0||ny<0||nx>=GW||ny>=GH) continue;
+      if(flags[ny*GW+nx]&1) walls++;
+    }
+    if(walls<1||walls>5) continue;
+    const x=(cx+0.5)*cell, y=(cy+0.5)*cell;
+    pts.push({x,y,walls,comp:compAt(x,y)});
+  }
+  return pts;
+}
+function playerCentroid(){
+  const ps=markers.filter(m=>!m.dummy&&!m.dead);
+  if(!ps.length) return {x:area.Wm/2,y:area.Hm/2};
+  let x=0,y=0; for(const p of ps){x+=p.x;y+=p.y;}
+  return {x:x/ps.length,y:y/ps.length};
+}
+function makeSquads(units,objective){
+  if(!units.length) return;
+  let bx=0,by=0; for(const u of units){bx+=u.x;by+=u.y;}
+  const base={x:bx/units.length,y:by/units.length};
+  const o=objective();
+  const ax=o.x-base.x, ay=o.y-base.y, L=Math.hypot(ax,ay)||1;
+  const ux=ax/L, uy=ay/L, nx=-uy, ny=ux;
+  const ns=Math.max(1,Math.round(units.length/AIP.squadSize));
+  units.sort((a,b)=>((a.x-base.x)*nx+(a.y-base.y)*ny)-((b.x-base.x)*nx+(b.y-base.y)*ny));
+  for(let s=0;s<ns;s++){
+    const members=units.filter((u,i)=>Math.floor(i*ns/units.length)===s);
+    if(!members.length) continue;
+    const sq={members,band:(s-(ns-1)/2)*AIP.band,ux,uy,nx,ny,base,objective,
+      pos:{x:base.x,y:base.y},state:"plan",next:null,movingSet:null,
+      waveA:members.filter((u,i)=>i%2===0),waveB:members.filter((u,i)=>i%2===1),
+      nextAt:performance.now()+s*4000+Math.random()*3000};   // Trupps starten versetzt
+    for(const u of members){ u.squad=sq; u.role="sq"; }
+    squads.push(sq);
+  }
+}
+function predictSpot(sq,now){
+  // wo steckt der Spieler vermutlich? Frische Kontakte > Strongpoint vor uns > Ziel
+  const fresh=lastContacts.filter(c=>now-c.t<20000);
+  if(fresh.length){
+    let best=null,bd=1e18;
+    for(const c of fresh){ const d=Math.hypot(c.x-sq.pos.x,c.y-sq.pos.y); if(d<bd){bd=d;best=c;} }
+    if(bd<220) return best;
+  }
+  const obj=sq.objective();
+  let best=null,bd=1e18;
+  for(const sp of (strongpoints||[])){
+    const d1=Math.hypot(sp.x-sq.pos.x,sp.y-sq.pos.y);
+    if(d1<30||d1>200) continue;
+    if((sp.x-sq.pos.x)*sq.ux+(sp.y-sq.pos.y)*sq.uy<10) continue;   // nur vor uns
+    const s2=d1+Math.hypot(sp.x-obj.x,sp.y-obj.y)*0.3;
+    if(s2<bd){ bd=s2; best=sp; }
+  }
+  return best||obj;
+}
+function squadThink(sq,now){
+  if(now<sq.nextAt) return;
+  sq.nextAt=now+AIP.thinkMs;
+  const alive=sq.members.filter(u=>!u.dead&&!u.carry);
+  if(!alive.length) return;
+  let px=0,py=0; for(const u of alive){px+=u.x;py+=u.y;}
+  sq.pos={x:px/alive.length,y:py/alive.length};
+  const obj=sq.objective();
+  if(sq.state==="plan"){
+    // naechste Stellung: Strongpoint 35-140 m naeher am Ziel, im eigenen Band.
+    // WICHTIG: Kandidaten per echter Wegsuche pruefen - Luftlinien-Naehe hinter
+    // einer Haeuserzeile bedeutet sonst einen Riesenumweg zu Fuss (Quatsch-Etappen)
+    const prog=p=>(obj.x-p.x)*sq.ux+(obj.y-p.y)*sq.uy;
+    const myProg=prog(sq.pos);
+    const pathLen=(x,y)=>{
+      const air=Math.hypot(x-sq.pos.x,y-sq.pos.y);
+      const r=findPath(sq.pos.x,sq.pos.y,x,y);
+      if(!r) return null;
+      let L=0;
+      for(let k=1;k<r.pts.length;k++) L+=Math.hypot(r.pts[k][0]-r.pts[k-1][0],r.pts[k][1]-r.pts[k-1][1]);
+      return {L,air};
+    };
+    const okPath=(x,y)=>{
+      const p=pathLen(x,y);
+      return p&&p.L<=p.air*2.2+30;
+    };
+    const cands=[];
+    for(const sp of (strongpoints||[])){
+      if(sp.comp!==compAt(sq.pos.x,sq.pos.y)) continue;
+      const adv=myProg-prog(sp);
+      if(adv<AIP.advMin||adv>AIP.advMax) continue;
+      const lat=(sp.x-sq.base.x)*sq.nx+(sp.y-sq.base.y)*sq.ny;
+      let s2=-Math.abs(lat-sq.band)*0.02+sp.walls*0.5+Math.random();
+      if(dangerZones.some(z=>now<z.until&&Math.hypot(sp.x-z.x,sp.y-z.y)<45)) s2-=9;
+      cands.push({sp,s2});
+    }
+    cands.sort((a,b)=>b.s2-a.s2);
+    let best=null;
+    for(const c of cands.slice(0,5)){
+      if(okPath(c.sp.x,c.sp.y)){ best=c.sp; break; }
+    }
+    if(Math.hypot(obj.x-sq.pos.x,obj.y-sq.pos.y)<70) best={x:obj.x,y:obj.y};
+    else if(!best){
+      // kein brauchbarer Strongpoint: Etappe ~110 m Richtung Ziel, notfalls seitlich versetzt
+      for(const off of [0,70,-70]){
+        const q=snapFreeXY(sq.pos.x+sq.ux*110+sq.nx*off,sq.pos.y+sq.uy*110+sq.ny*off,compAt(sq.pos.x,sq.pos.y));
+        if(okPath(q[0],q[1])){ best={x:q[0],y:q[1]}; break; }
+      }
+      if(!best){
+        const q=snapFreeXY(sq.pos.x+sq.ux*110,sq.pos.y+sq.uy*110,compAt(sq.pos.x,sq.pos.y));
+        best={x:q[0],y:q[1]};
+      }
+    }
+    sq.next=best; sq.state="moveA"; sq.movingSet=null;
+  }
+  if(sq.state==="moveA"||sq.state==="moveB"){
+    const movers=(sq.state==="moveA"?sq.waveA:sq.waveB).filter(u=>!u.dead&&!u.carry&&!u.covering);
+    const holders=(sq.state==="moveA"?sq.waveB:sq.waveA).filter(u=>!u.dead&&!u.carry);
+    if(!sq.movingSet){
+      sq.movingSet=true;
+      const th=predictSpot(sq,now);
+      for(const u of holders) if(!u.walk) u.focus={type:"point",x:th.x,y:th.y};   // Ueberwachung
+      const pts=spread(sq.next.x,sq.next.y,Math.max(1,movers.length));
+      movers.forEach((u,i)=>{
+        const q=snapFreeXY(pts[i][0],pts[i][1],compAt(u.x,u.y));
+        const r=findPath(u.x,u.y,q[0],q[1]);
+        if(r){ startWalk(u,r); u.focus=null; }
+      });
+    }
+    if(movers.every(u=>!u.walk)){
+      // angekommen: Fokus auf den wahrscheinlichen Spieler-Spot ("um die Ecke ziehen")
+      const th=predictSpot(sq,now);
+      for(const u of movers) u.focus={type:"point",x:th.x,y:th.y};
+      sq.movingSet=null;
+      if(sq.state==="moveA") sq.state="moveB";
+      else { sq.state="plan"; sq.nextAt=now+AIP.planPause+Math.random()*AIP.planPauseRnd; }
+    }
+  }
+}
+/* Klettern ist laut: Gegner, die es sehen oder hoeren (<=40 m, auch ohne Sichtlinie),
+   nehmen automatisch Fokus auf die Stelle – bis das Ziel weg ist, dann alter Fokus zurueck */
+function noiseStep(now){
+  for(const u of markers){
+    if(u.dummy||u.dead) continue;
+    const w=u.walk;
+    if(!w||!(w.pause>0)) continue;
+    for(const e of markers){
+      if(!e.dummy||e.dead) continue;
+      const d=Math.hypot(e.x-u.x,e.y-u.y);
+      if(d>160) continue;
+      if(d<=(u.walk.noiseR||40)||canSeeUnit(e,u)){   // Zaun laut, Mauer leise
+        if(!e.noise) e.noise={saved:e.focus||null};
+        e.noise.until=now+2000;
+        e.focus={type:"point",x:u.x,y:u.y,__noise:true};
+      }
+    }
+  }
+  for(const e of markers){
+    if(!e.dummy||e.dead||!e.noise) continue;
+    if(now>=e.noise.until){
+      if(e.focus&&e.focus.__noise) e.focus=e.noise.saved;
+      e.noise=null;
+    }
+  }
+}
+/* Feindkontakt: Spaeher ziehen sich zurueck, Nachschub verlagert sich fuer eine Weile in den Alarmbereich */
+let alarm=null;
+function enemyContact(s,t,now){
+  if(gameMode!=="defusal"&&gameMode!=="ctf") return;
+  if(s.role==="scout"&&!s.retreating){
+    s.retreating=true; s.walk=null; s.focus=null;
+    const sp=s.homeSpot||{x:s.x,y:s.y};
+    const [rx,ry]=snapFreeXY(sp.x+(s.x-sp.x)*0.2, sp.y+(s.y-sp.y)*0.2, compAt(sp.x,sp.y));
+    s.order={x:rx,y:ry,fx:t.x,fy:t.y,withFocus:true};
+    s.role="def"; s.nextAi=0;
+  }
+  if(!alarm||now>alarm.next){
+    alarm={x:t.x,y:t.y,until:now+25000,next:now+12000};
+    // 2 Verteidiger ruecken fuer 25 s in Richtung Alarm nach (die naechsten stehen schon gut – nimm die dahinter)
+    const helpers=markers.filter(m=>m.dummy&&!m.dead&&m!==s&&m.role==="def"&&!m.tempOrder)
+      .sort((a,b)=>Math.hypot(a.x-t.x,a.y-t.y)-Math.hypot(b.x-t.x,b.y-t.y))
+      .slice(1,3);
+    for(const h of helpers){
+      const q=snapFreeXY(t.x+(h.x-t.x)*0.45, t.y+(h.y-t.y)*0.45, compAt(t.x,t.y));
+      h.tempOrder={x:q[0],y:q[1],fx:t.x,fy:t.y,withFocus:true,until:now+25000};
+      h.focus=null; h.nextAi=0;
+    }
+  }
+}
+/* Ziel-Rendering */
+function objMark(x,y,col,label,r){
+  const g=document.createElementNS(NS,"g");
+  const ring=document.createElementNS(NS,"circle");
+  ring.setAttribute("class","spotring"); ring.setAttribute("r",r||9);
+  ring.setAttribute("cx",x); ring.setAttribute("cy",y); ring.setAttribute("stroke",col);
+  g.appendChild(ring);
+  const dot=document.createElementNS(NS,"circle");
+  dot.setAttribute("r",2.5); dot.setAttribute("cx",x); dot.setAttribute("cy",y); dot.setAttribute("fill",col);
+  g.appendChild(dot);
+  if(label){
+    const t=document.createElementNS(NS,"text");
+    t.setAttribute("class","objlbl"); t.setAttribute("x",x+11); t.setAttribute("y",y+3);
+    t.setAttribute("fill",col); t.textContent=label;
+    g.appendChild(t);
+  }
+  return g;
+}
+function flagIcon(x,y,col){
+  const g=document.createElementNS(NS,"g");
+  g.setAttribute("transform",`translate(${x} ${y})`);
+  const p=document.createElementNS(NS,"path");
+  p.setAttribute("d","M0 2 L0 -12 L8 -9.5 L0 -7");
+  p.setAttribute("fill",col); p.setAttribute("stroke","#fff"); p.setAttribute("stroke-width",1);
+  g.appendChild(p);
+  return g;
+}
+function drawObjectives(){
+  L.obj.innerHTML="";
+  if(phase==="chooseFlag"&&flags&&flags.cand){
+    L.obj.appendChild(objMark(flags.cand[0].x,flags.cand[0].y,"#1c1c1a","Position 1",12));
+    L.obj.appendChild(objMark(flags.cand[1].x,flags.cand[1].y,"#1c1c1a","Position 2",12));
+    L.obj.appendChild(flagIcon(flags.cand[0].x,flags.cand[0].y,"#8d8d86"));
+    L.obj.appendChild(flagIcon(flags.cand[1].x,flags.cand[1].y,"#8d8d86"));
+  } else if(gameMode==="ctf"&&phase==="play"&&flags){
+    L.obj.appendChild(objMark(flags.pHome.x,flags.pHome.y,placeColor,"Deine Basis",12));
+    L.obj.appendChild(objMark(flags.eHome.x,flags.eHome.y,ENEMY_COLOR,"Gegner-Basis",12));
+    L.obj.appendChild(flagIcon(flags.pFlag.x,flags.pFlag.y,placeColor));
+    L.obj.appendChild(flagIcon(flags.eFlag.x,flags.eFlag.y,ENEMY_COLOR));
+  } else if(phase==="chooseSet"&&defusal&&defusal.sets){
+    const cols=["#b58900","#8a4bc9"];
+    defusal.sets.forEach((s,i)=>{
+      L.obj.appendChild(objMark(s.a.x,s.a.y,cols[i],"A"+(i+1)));
+      L.obj.appendChild(objMark(s.b.x,s.b.y,cols[i],"B"+(i+1)));
+      L.obj.appendChild(objMark(s.spawn.x,s.spawn.y,cols[i],"Spawn "+(i+1),13));
+    });
+  } else if(gameMode==="defusal"&&phase==="play"&&defusal){
+    L.obj.appendChild(objMark(defusal.a.x,defusal.a.y,"#b58900","A"));
+    L.obj.appendChild(objMark(defusal.b.x,defusal.b.y,"#b58900","B"));
+    L.obj.appendChild(objMark(defusal.spawn.x,defusal.spawn.y,ENEMY_COLOR,"Gegner-Spawn"));
+    if(defusal.bomb){
+      const b=objMark(defusal.bomb.x,defusal.bomb.y,"#c2452d","💣",7);
+      L.obj.appendChild(b);
+    }
+  }
+}
+/* Start der Modi */
+function startCtf(){
+  const cands=goodCands(playerComp(),240);
+  let best=null;
+  for(let a=0;a<cands.length;a+=3) for(let b=a+3;b<cands.length;b+=3){
+    const s=Math.hypot(cands[a].x-cands[b].x,cands[a].y-cands[b].y)+(cands[a].cover+cands[b].cover)*18;
+    if(!best||s>best.s) best={s,a:cands[a],b:cands[b]};
+  }
+  if(!best){ setStatus("Keine geeigneten Flaggenpositionen gefunden."); return; }
+  flags={cand:[best.a,best.b]};
+  phase="chooseFlag";
+  drawObjectives();
+  setStatus("Capture the Flag: Linksklick auf Position 1 oder 2 = DEINE Flagge (die andere gehört dem Gegner). Rechtsklick verschiebt den nächstgelegenen Punkt.");
+}
+function chooseFlagAt(i){
+  const own=flags.cand[i], en=flags.cand[1-i];
+  flags={pHome:own,eHome:en,
+         pFlag:{x:own.x,y:own.y,carrier:null,atHome:true},
+         eFlag:{x:en.x,y:en.y,carrier:null,atHome:true}};
+  teleportUnits(own.x,own.y);
+  const n=markers.filter(m=>!m.dummy&&m.color===placeColor).length;
+  spawnEnemiesAt(en.x,en.y,n,null,own);
+  const ds=markers.filter(m=>m.dummy);
+  const atk=ds.filter((m,i2)=>i2%2===0), def=ds.filter((m,i2)=>i2%2===1);
+  dangerZones=[]; squads=[]; lastContacts=[];
+  strongpoints=computeStrongpoints();
+  makeSquads(atk,()=>({x:flags.pFlag.x,y:flags.pFlag.y}));   // Ziel trackt die Flagge live
+  assignDefense(def,en);   // Verteidiger beziehen geplante Stellungen um die eigene Flagge
+  enemyTotal=n; ownTotal=n;
+  phase="play"; combatOn=true; ensureAnim(); updateScore(); updateVision(true); drawObjectives();
+  setStatus("CTF läuft: Hol die graue Flagge zu deiner Basis – und pass auf deine auf!");
+}
+function makeDefSet(cands){
+  let best=null;
+  for(let t=0;t<400;t++){
+    const a=cands[(Math.random()*cands.length)|0], b=cands[(Math.random()*cands.length)|0];
+    const d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(d<140||d>500) continue;
+    const s=d*0.3+(a.cover+b.cover)*20+Math.random()*30;
+    if(!best||s>best.s) best={s,a,b};
+  }
+  if(!best) return null;
+  const [sx,sy]=snapFreeXY((best.a.x+best.b.x)/2,(best.a.y+best.b.y)/2,compAt(best.a.x,best.a.y));
+  return {a:best.a,b:best.b,spawn:{x:sx,y:sy}};
+}
+function startDefusal(){
+  const cands=goodCands(playerComp(),240);
+  const s1=makeDefSet(cands), s2=makeDefSet(cands);
+  if(!s1||!s2){ setStatus("Keine geeigneten Ziel-Konstellationen gefunden."); return; }
+  defusal={sets:[s1,s2]};
+  phase="chooseSet";
+  drawObjectives();
+  setStatus("Defusal: Linksklick auf „Spawn 1“/„Spawn 2“ wählt die Konstellation. Rechtsklick verschiebt vorher den nächstgelegenen Punkt (Spots & Spawns).");
+}
+function chooseSetAt(i){
+  const s=defusal.sets[i];
+  defusal={a:s.a,b:s.b,spawn:s.spawn,bomb:null,plantP:0};
+  // Gegner starten am Spawn und beziehen dann geplante Stellungen an beiden Spots
+  const n=Math.max(2,markers.filter(m=>!m.dummy&&m.color===placeColor).length);
+  const newDummies=[];
+  const spawnCid=compAt(s.spawn.x,s.spawn.y);
+  spread(s.spawn.x,s.spawn.y,n).forEach(p=>{
+    const q=snapFreeXY(p[0],p[1],spawnCid);
+    newDummies.push(makeDummy(q[0],q[1],Math.random()*6.283,"def",null));
+  });
+  const nA=Math.ceil(n/2);
+  assignDefense(newDummies.slice(0,nA), s.a);
+  assignDefense(newDummies.slice(nA), s.b);
+  enemyTotal=markers.filter(m=>m.dummy).length;
+  ownTotal=markers.filter(m=>!m.dummy&&m.color===placeColor).length;
+  phase="play"; combatOn=true; ensureAnim(); updateScore(); updateVision(true); drawObjectives();
+  setStatus("Defusal läuft: Nimm von deiner Position aus Spot A oder B, bleib dort 4 s (Bombe legen), dann 45 s verteidigen.");
+}
+function winGame(msg){ gameOver=true; gameMsg=msg; setStatus(msg); }
+/* KI-Bewegung */
+function wanderNear(m,now,ax,ay,rad){
+  if(m.walk) return;
+  if(!m.nextAi){ m.nextAi=now+1500+Math.random()*5000; return; }
+  if(now<m.nextAi) return;
+  m.nextAi=now+3500+Math.random()*7000;
+  const a=Math.random()*6.283, d=rad*(0.35+Math.random()*0.65);
+  const r=findPath(m.x,m.y,ax+Math.cos(a)*d,ay+Math.sin(a)*d);
+  if(r&&r.pts.length>1) startWalk(m,r);
+}
+function aiStep(now){
+  if(gameOver) return;
+  for(const sq of squads) squadThink(sq,now);
+  for(const m of markers){
+    if(!m.dummy||m.dead) continue;
+    if(m.covering&&now>m.covering) m.covering=null;
+    if(gameMode==="ctf"&&phase==="play"&&flags){
+      if(m.carry==="enemy"){
+        if(!m.walk&&now>(m.nextAi||0)){ const r=findPath(m.x,m.y,flags.eHome.x,flags.eHome.y); if(r) startWalk(m,r); m.nextAi=now+2500; }
+      } else if(m.role==="sq"){
+        seekCover(m,now);
+      } else aiHoldOrder(m,now);
+    } else if(gameMode==="defusal"&&phase==="play"&&defusal){
+      if(defusal.bomb){
+        if(!m.walk&&now>(m.nextAi||0)&&Math.hypot(m.x-defusal.bomb.x,m.y-defusal.bomb.y)>3.5){
+          const r=findPath(m.x,m.y,defusal.bomb.x,defusal.bomb.y); if(r) startWalk(m,r); m.nextAi=now+2500;
+        }
+      } else aiHoldOrder(m,now);
+    } else {
+      if(m.role==="sq"){ seekCover(m,now); continue; }
+      if(m.patrol) continue;               // Patrouillen macht patrolStep
+      wanderNear(m,now,m.x,m.y,110);       // freies Wandern im Scharmützel
+    }
+  }
+}
+/* Ziel-Logik pro Frame */
+function objTick(now,dtS){
+  if(gameOver) return;
+  if(gameMode==="ctf"&&phase==="play"&&flags){
+    const F=flags;
+    for(const fl of [F.pFlag,F.eFlag]){
+      if(fl.carrier){
+        if(fl.carrier.dead) fl.carrier=null;
+        else { fl.x=fl.carrier.x; fl.y=fl.carrier.y; }
+      }
+    }
+    for(const m of markers){
+      if(m.dead) continue;
+      if(!m.dummy){
+        if(!F.eFlag.carrier&&Math.hypot(m.x-F.eFlag.x,m.y-F.eFlag.y)<5){
+          F.eFlag.carrier=m; F.eFlag.atHome=false; m.carry="enemy";
+          setStatus("Gegnerische Flagge aufgenommen – bring sie heim! (Sicht reduziert)");
+        } else if(!F.pFlag.carrier&&!F.pFlag.atHome&&Math.hypot(m.x-F.pFlag.x,m.y-F.pFlag.y)<5){
+          F.pFlag.carrier=m; m.carry="own";
+          setStatus("Eigene Flagge aufgenommen – zurück zur Basis. (Sicht verbessert)");
+        }
+      } else {
+        if(!F.pFlag.carrier&&Math.hypot(m.x-F.pFlag.x,m.y-F.pFlag.y)<5){
+          F.pFlag.carrier=m; F.pFlag.atHome=false; m.carry="enemy";
+          setStatus("⚠ Der Gegner hat deine Flagge!");
+        }
+      }
+    }
+    if(F.pFlag.carrier&&!F.pFlag.carrier.dummy&&Math.hypot(F.pFlag.x-F.pHome.x,F.pFlag.y-F.pHome.y)<6){
+      F.pFlag.carrier.carry=null; F.pFlag.carrier=null;
+      F.pFlag.x=F.pHome.x; F.pFlag.y=F.pHome.y; F.pFlag.atHome=true;
+      setStatus("Eigene Flagge gesichert.");
+    }
+    if(F.eFlag.carrier&&!F.eFlag.carrier.dummy&&Math.hypot(F.eFlag.carrier.x-F.pHome.x,F.eFlag.carrier.y-F.pHome.y)<8)
+      winGame("🏆 Flagge erobert – GEWONNEN!");
+    if(F.pFlag.carrier&&F.pFlag.carrier.dummy&&Math.hypot(F.pFlag.carrier.x-F.eHome.x,F.pFlag.carrier.y-F.eHome.y)<8)
+      winGame("Der Gegner hat deine Flagge heimgebracht – verloren.");
+    drawObjectives();
+  } else if(gameMode==="defusal"&&phase==="play"&&defusal){
+    const D=defusal;
+    if(!D.bomb){
+      let planting=false;
+      for(const s of [D.a,D.b]){
+        const u=markers.find(m=>!m.dummy&&!m.dead&&!m.walk&&Math.hypot(m.x-s.x,m.y-s.y)<4);
+        if(u){
+          planting=true;
+          D.plantP+=dtS;
+          setStatus("Bombe wird gelegt … "+Math.min(100,Math.round(D.plantP/4*100))+" %");
+          if(D.plantP>=4){
+            D.bomb={x:s.x,y:s.y,timer:45,defuseP:0};
+            D.plantP=0;
+            for(const m of markers) if(m.dummy&&!m.dead) m.nextAi=0;
+            setStatus("💣 Bombe gelegt – 45 s halten!");
+          }
+          break;
+        }
+      }
+      if(!planting) D.plantP=0;
+    } else {
+      D.bomb.timer-=dtS;
+      const df=markers.find(m=>m.dummy&&!m.dead&&!m.walk&&Math.hypot(m.x-D.bomb.x,m.y-D.bomb.y)<4);
+      if(df){
+        D.bomb.defuseP+=dtS;
+        if(D.bomb.defuseP>=5){
+          D.bomb=null;
+          for(const m of markers) if(m.dummy&&!m.dead) m.nextAi=0;
+          setStatus("Bombe entschärft – du kannst erneut legen.");
+        }
+      } else if(D.bomb) D.bomb.defuseP=Math.max(0,D.bomb.defuseP-dtS*0.5);
+      if(D.bomb){
+        if(D.bomb.timer<=0) winGame("💥 Ziel zerstört – GEWONNEN!");
+        else {
+          const t=Math.ceil(D.bomb.timer);
+          if(t!==D.lastT){ D.lastT=t; setStatus((D.bomb.defuseP>0.5?("⚠ Gegner entschärft ("+Math.round(D.bomb.defuseP/5*100)+" %) – "):"💣 ")+t+" s bis zur Detonation"); }
+        }
+      }
+    }
+    drawObjectives();
+  }
+}
+function resetGame(){
+  combatOn=false; phase="idle"; gameOver=false; gameMsg="";
+  flags=null; defusal=null; alarm=null; dangerZones=[]; squads=[]; strongpoints=null; lastContacts=[];
+  L.obj.innerHTML="";
+  for(const m of [...markers]){
+    if(m.dummy){ if(m.g)m.g.remove(); if(m.line)m.line.remove(); markers.splice(markers.indexOf(m),1); }
+    else m.carry=null;
+  }
+  document.getElementById("btnStart").textContent="▶ Start";
+  L.comp.style.display="";
+  document.getElementById("score").style.display="none";
+  updateVision();
+  setStatus("Spiel beendet.");
+}
+document.getElementById("btnStart").onclick=()=>{
+  const btn=document.getElementById("btnStart");
+  if(combatOn||phase!=="idle"){ resetGame(); return; }
+  const own=markers.filter(m=>!m.dummy&&m.color===placeColor);
+  if(!own.length){ setStatus("Erst eigene Einheiten setzen (📍)."); return; }
+  gameMode=document.getElementById("mode").value;
+  gameOver=false; gameMsg="";
+  L.comp.style.display="none";
+  btn.textContent="⏹ Beenden";
+  if(gameMode==="ctf"){ startCtf(); return; }
+  if(gameMode==="defusal"){ startDefusal(); return; }
+  const n=own.length;
+  const placed=spawnDummies(n);
+  if(!placed){ setStatus("Keine Spawn-Plätze im gewählten Bereich gefunden."); btn.textContent="▶ Start"; L.comp.style.display=""; return; }
+  // Scharmuetzel: 2/3 der Gegner ruecken als Trupps auf die Spieler vor, Rest patrouilliert
+  dangerZones=[]; squads=[]; lastContacts=[];
+  strongpoints=computeStrongpoints();
+  const freeD=markers.filter(m=>m.dummy&&!m.patrol);
+  makeSquads(freeD.slice(0,Math.ceil(freeD.length*0.67)),()=>playerCentroid());
+  phase="play"; combatOn=true; ensureAnim();
+  enemyTotal=placed;
+  ownTotal=markers.filter(m=>!m.dummy).length;
+  updateScore();
+  setStatus(placed+" Gegner platziert. Deine Einheiten feuern nur mit Fokus oder unter Beschuss.");
+};
+
+/* Bewegung */
+let animOn=false, lastT=0;
+function ensureAnim(){ if(!animOn){ animOn=true; lastT=performance.now(); requestAnimationFrame(tick); } }
+function walkPoint(w,d){
+  let i=1;
+  while(i<w.cum.length&&w.cum[i]<d) i++;
+  if(i>=w.cum.length) return w.pts[w.pts.length-1];
+  const t=(d-w.cum[i-1])/Math.max(1e-9,w.cum[i]-w.cum[i-1]);
+  return [w.pts[i-1][0]+(w.pts[i][0]-w.pts[i-1][0])*t, w.pts[i-1][1]+(w.pts[i][1]-w.pts[i-1][1])*t];
+}
+function tick(now){
+  const dtS=Math.min(0.1,(now-lastT)/1000); lastT=now;
+  let any=false, climbing=false, moving=0, remTot=0;
+  for(const m of markers){
+    const w=m.walk;
+    if(!w) continue;
+    any=true;
+    if(w.pause>0){ w.pause-=dtS; climbing=true; }
+    else{
+      w.dist+=WSPEED*speedFactor(flagsAt(m.x,m.y))*dtS;
+      if(w.evI<w.events.length&&w.dist>=w.events[w.evI].at){ const ev=w.events[w.evI]; w.dist=ev.at; w.evI++; w.pause=ev.d; w.noiseR=ev.nr; }
+      if(w.dist>=w.total){
+        const end=w.pts[w.pts.length-1];
+        m.x=end[0]; m.y=end[1];
+        m.walk=null; m.walkDir=null;
+        drawRouteFor(m,null); drawMarkerEl(m);
+        continue;
+      }
+    }
+    const p=walkPoint(w,w.dist);
+    if(Math.hypot(p[0]-m.x,p[1]-m.y)>1e-6) m.walkDir=Math.atan2(p[1]-m.y,p[0]-m.x);
+    m.x=p[0]; m.y=p[1];
+    drawMarkerEl(m);
+    // Routenlinie nur fuer eigene Einheiten und gedrosselt (Pfad-Strings sind teuer)
+    if(!m.dummy&&(!w.lastRT||now-w.lastRT>=150)){
+      w.lastRT=now;
+      let i=1; while(i<w.cum.length&&w.cum[i]<w.dist) i++;
+      drawRouteFor(m,[p,...w.pts.slice(i)]);
+    }
+    moving++; remTot+=w.total-w.dist;
+  }
+  if(combatOn&&!gameOver){ aiStep(now); patrolStep(now); combatStep(now); noiseStep(now); objTick(now,dtS); }
+  if(gameOver&&gameMsg) setStatus(gameMsg);
+  if(any||combatOn){
+    updateVision();
+    if(any){
+      const ownMoving=markers.some(m=>m.walk&&!m.dummy);
+      if(ownMoving) setStatus(climbing?"Klettert über Hindernis …":("Unterwegs – "+moving+" Einheit(en), insgesamt noch "+Math.round(remTot)+" m"));
+    }
+    requestAnimationFrame(tick);
+  } else {
+    animOn=false;
+    setStatus("Angekommen.");
+    setTimeout(()=>{ if(!animOn&&!sel.size&&!placeMode) setStatus(null); },2500);
+  }
+}
+
+/* Tastatur-Navigation (WASD/Pfeile) + Esc */
+const panKeys=new Set();
+const KEYMAP={w:[0,1],W:[0,1],ArrowUp:[0,1],s:[0,-1],S:[0,-1],ArrowDown:[0,-1],a:[1,0],A:[1,0],ArrowLeft:[1,0],d:[-1,0],D:[-1,0],ArrowRight:[-1,0]};
+let panAnim=false, panLast=0;
+function panTick(now){
+  if(!panKeys.size){ panAnim=false; return; }
+  const dtS=Math.min(0.05,(now-panLast)/1000); panLast=now;
+  let dx=0, dy=0;
+  for(const k2 of panKeys){ const v=KEYMAP[k2]; if(v){ dx+=v[0]; dy+=v[1]; } }
+  const st=area?dt:ov;
+  st.tx+=dx*700*dtS; st.ty+=dy*700*dtS;
+  st.apply();
+  requestAnimationFrame(panTick);
+}
+addEventListener("keydown",e=>{
+  if(KEYMAP[e.key]){
+    e.preventDefault();
+    panKeys.add(e.key);
+    if(!panAnim){ panAnim=true; panLast=performance.now(); requestAnimationFrame(panTick); }
+    return;
+  }
+  if((e.key==="r"||e.key==="R")&&area&&sel.size){ clearFocus(); return; }
+  if(e.key==="Escape"){
+    placeMode=false; btnMk.classList.remove("active");
+    document.getElementById("dt").classList.remove("place");
+    ov.boxMode=false; btnBox.classList.remove("active");
+    document.getElementById("ov").classList.remove("boxmode");
+    sel.clear(); redrawMarkers();
+    if(area) updateVision();
+    setStatus(null);
+  }
+});
+addEventListener("keyup",e=>{ panKeys.delete(e.key); });
+addEventListener("blur",()=>panKeys.clear());
+
+/* Karte als Datei sichern / laden (funktioniert auch, wenn IndexedDB blockiert ist) */
+document.getElementById("btnSave").onclick=()=>{
+  if(!window.curArea) return;
+  const blob=new Blob([JSON.stringify(window.curArea)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="einsatzkarte-"+(window.curArea.label||"bereich").replace(/[^a-zA-Z0-9äöüÄÖÜß-]+/g,"_")+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  setStatus("Bereich als Datei gespeichert (Downloads-Ordner). Über „Karte aus Datei laden“ in der Übersicht wieder öffnen.");
+};
+document.getElementById("fileload").addEventListener("change",e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const j=JSON.parse(rd.result);
+      if(j&&j.data&&j.S!=null) loadArea(j.S,j.W,j.N,j.E,j.data);
+      else setStatus("Datei hat kein gültiges Einsatzkarten-Format.");
+    }catch(err){ setStatus("Datei konnte nicht gelesen werden."); }
+  };
+  rd.readAsText(f);
+  e.target.value="";
+});
+document.getElementById("zin").onclick=()=>{ (area?dt:ov).zoomAt(innerWidth/2,innerHeight/2,1.5); };
+document.getElementById("zout").onclick=()=>{ (area?dt:ov).zoomAt(innerWidth/2,innerHeight/2,1/1.5); };
+addEventListener("resize",()=>{ if(!area) updateOvTiles(); });
+
+/* Start */
+fitGermany();
+updateOvTiles();
+renderSaved();
+setStatus("Mit „▭ Bereich wählen“ ein Rechteck aufziehen – dieser Ausschnitt wird als Einsatzgebiet geladen.");
+</script>
